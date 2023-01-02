@@ -12,6 +12,9 @@ services:
       - DB_USER=root
       - DB_PASSWORD=secret
       - DB_NAME=user_management
+      - REDIS_HOST=auth-blacklist
+      - REDIS_PASSWORD=password123
+      - REDIS_PORT=6379
     depends_on:
       - user-db
   user-db:
@@ -31,3 +34,9 @@ services:
       ME_CONFIG_MONGODB_ADMINPASSWORD: secret
       ME_CONFIG_MONGODB_SERVER: user-db
     restart: always
+  auth-blacklist:
+    image: redis
+    ports:
+      - 6379:6379
+    environment:
+      - REDIS_PASSWORD=password123

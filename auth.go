@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,7 +22,26 @@ import (
 var collection *mongo.Collection
 var ctx = context.TODO()
 
+var rdb *redis.Client
+var maxExperiation time.Duration
+
 var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+
+func initCache() {
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0, // use default DB
+	})
+}
+
+func initMaxExperation() {
+	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
+	if err != nil {
+		panic(err)
+	}
+	maxExperiation = time.Duration(mins) * time.Minute
+}
 
 func initDb() {
 	mongoUri := "mongodb://" + os.Getenv("DB_USER") + ":" + os.Getenv("DB_PASSWORD") + "@" + os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT")
@@ -78,6 +98,10 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+type SuspendForm struct {
+	Id string `json:"id"`
+}
+
 func Signup(w http.ResponseWriter, r *http.Request) {
 	var creds RegisterForm
 	// Get the JSON body and decode into credentials
@@ -106,7 +130,7 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		FirstName:      creds.FirstName,
 		LastName:       creds.LastName,
 		HashedPassword: hashedPassword,
-		Active:         true,
+		Suspended:      true,
 	}
 	collection.InsertOne(ctx, user)
 }
@@ -125,12 +149,16 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	// expectedPassword, ok := users[creds.Username]
 	user := &User{}
 	notFoundErr := collection.FindOne(ctx, bson.D{{"email", creds.Email}}).Decode(user)
+	if notFoundErr == mongo.ErrNoDocuments {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	// If a password exists for the given user
 	// AND, if it is the same as the password we received, the we can move ahead
 	// if NOT, then we return an "Unauthorized" status
 	validPass := verifyPassword(user.HashedPassword, creds.Password)
-	if notFoundErr == mongo.ErrNoDocuments || !validPass {
+	if !validPass || user.Suspended { // if user is suspended do not issue token
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -198,6 +226,13 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
+	// If user is not authorised then do not refresh token
+	_, user := authenticate(r)
+	if user.Suspended {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	// (END) The code uptil this point is the same as the first part of the `Welcome` route
 
 	// We ensure that a new token is not issued until enough time has elapsed
@@ -234,9 +269,64 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func isAuthorised(user *User) bool {
+	return !user.Suspended
+}
+
+func authenticate(r *http.Request) (int, *User) {
+	user := &User{}
+	// (BEGIN) The code uptil this point is the same as the first part of the `Welcome` route
+	c, err := r.Cookie("token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return http.StatusUnauthorized, user
+		}
+		return http.StatusBadRequest, user
+	}
+	tknStr := c.Value
+	claims := &Claims{}
+	tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return http.StatusUnauthorized, user
+		}
+		return http.StatusBadRequest, user
+	}
+	if !tkn.Valid {
+		return http.StatusUnauthorized, user
+	}
+
+	// Check user is auth and active - get by id
+	// get user by id
+
+	objID, _ := primitive.ObjectIDFromHex(claims.Id)
+	value := collection.FindOne(ctx, bson.M{"_id": objID}).Decode(user)
+
+	if value == mongo.ErrNoDocuments || user.Suspended {
+		return http.StatusUnauthorized, user
+	} else {
+		return http.StatusOK, user
+	}
+
+}
+
 // only admin can do this
-func deactivateUser() {
+func suspendUser(w http.ResponseWriter, r *http.Request) {
 	// add id to blacklist until token expires
+	status, user := authenticate(r)
+	if status == http.StatusOK && user.Admin {
+		var suspendUser SuspendForm
+		// Get the JSON body and decode into credentials
+		err := json.NewDecoder(r.Body).Decode(&suspendUser)
+		if err != nil {
+			// If the structure of the body is wrong, return an HTTP error
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		rdb.Set(context.Background(), suspendUser.Id, suspendUser.Id, maxExperiation)
+	}
 }
 
 func deleteUser() {

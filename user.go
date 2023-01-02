@@ -7,6 +7,7 @@ type User struct {
 	Email          string             `bson:"email"`
 	FirstName      string             `bson:"first_name"`
 	LastName       string             `bson:"last_name"`
-	HashedPassword string             `bson:"hashed_password"` // do not return password
-	Active         bool               `bson:"active"`          // do not return active status
+	HashedPassword string             `bson:"hashed_password"`
+	Suspended      bool               `bson:"suspended"`
+	Admin          bool               `bson:"admin"`
 }

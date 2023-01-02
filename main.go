@@ -7,6 +7,7 @@ import (
 
 func main() {
 	initDb()
+	initCache()
 
 	// we will implement these handlers in the next sections
 	http.HandleFunc("/signin", Signin)

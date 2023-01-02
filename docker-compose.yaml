@@ -1,0 +1,33 @@
+services:
+  user-management:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=secret
+      - JWT_TOKEN_EXP_MIN=60
+      - DB_HOST=user-db
+      - DB_PORT=27017
+      - DB_USER=root
+      - DB_PASSWORD=secret
+      - DB_NAME=user_management
+    depends_on:
+      - user-db
+  user-db:
+    image: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=secret
+      - MONGO_INITDB_DATABASE=user_management
+  db-gui:
+    image: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: secret
+      ME_CONFIG_MONGODB_SERVER: user-db
+    restart: always

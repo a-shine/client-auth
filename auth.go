@@ -25,7 +25,7 @@ var ctx = context.TODO()
 var rdb *redis.Client
 var maxExperiation time.Duration
 
-var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
 func initCache() {
 	rdb = redis.NewClient(&redis.Options{
@@ -313,7 +313,7 @@ func authenticate(r *http.Request) (int, *User) {
 }
 
 // only admin can do this
-func suspendUser(w http.ResponseWriter, r *http.Request) {
+func SuspendUser(w http.ResponseWriter, r *http.Request) {
 	// add id to blacklist until token expires
 	status, user := authenticate(r)
 	if status == http.StatusOK && user.Admin {
@@ -329,7 +329,13 @@ func suspendUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deleteUser() {
+// TODO
+// Make this service read the gateway.conf file to get the list of auth services
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// send delete signal to other services (each service will deal with delete it its own way)
 	// add id to blacklist until token expires
+
+	// submit a user deletion job in the gateway? The gateway will periodically delete user data for each auth service
+	// Do this in the redis table?
+
 }

@@ -8,6 +8,7 @@ import (
 func main() {
 	initDb()
 	initCache()
+	initMaxExperation()
 
 	// we will implement these handlers in the next sections
 	http.HandleFunc("/signin", Signin)

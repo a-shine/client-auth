@@ -13,3 +13,5 @@ Dependencies MongoDB
 
 curl -v -XPOST -H "Content-type: application/json" -d '{"password": "test", "email":"sjchgsajdhgc", "first_name":"alex", "last_name":"kjsd"}' 'localhost:8000/signup'
 
+<!-- TODO: -->
+Could add a couple of routes for an admin to manage users (delete, update, etc.) and a route to change password.

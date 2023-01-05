@@ -102,6 +102,10 @@ type SuspendForm struct {
 	Id string `json:"id"`
 }
 
+type DeleteForm struct {
+	Id string `json:"id"`
+}
+
 func Signup(w http.ResponseWriter, r *http.Request) {
 	var creds RegisterForm
 	// Get the JSON body and decode into credentials
@@ -331,6 +335,7 @@ func SuspendUser(w http.ResponseWriter, r *http.Request) {
 
 // TODO
 // Make this service read the gateway.conf file to get the list of auth services
+// When user wishes to delete account, notify admin, admin can then delete user from all services by submitting the user id to this endpoint
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// send delete signal to other services (each service will deal with delete it its own way)
 	// add id to blacklist until token expires
@@ -338,4 +343,24 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// submit a user deletion job in the gateway? The gateway will periodically delete user data for each auth service
 	// Do this in the redis table?
 
+	// publish to redis delete-user channel
+	// gateway will listen to this channel and delete user data from all services
+	// gateway will also delete user data from its own database
+	// status, user := authenticate(r)
+	// if status == http.StatusOK && user.Admin {
+	// var deleteUser DeleteForm
+	// // Get the JSON body and decode into credentials
+	// err := json.NewDecoder(r.Body).Decode(&deleteUser)
+	// if err != nil {
+	// 	// If the structure of the body is wrong, return an HTTP error
+	// 	w.WriteHeader(http.StatusBadRequest)
+	// 	return
+	// }
+	if err := rdb.Publish(context.Background(), "user-delete", "user ID").Err(); err != nil {
+		fmt.Println(err)
+	}
+	// } else {
+	// w.WriteHeader(http.StatusUnauthorized)
+	// return
+	// }
 }

@@ -188,7 +188,7 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	// Create the JWT claims, which includes the username and expiry time
 	claims := &Claims{
 		// TODO: Change to Id
-		Id: user.Id.String(),
+		Id: user.Id.Hex(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			// In JWT, the expiry time is expressed as unix milliseconds
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

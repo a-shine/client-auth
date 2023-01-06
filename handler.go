@@ -134,11 +134,13 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		FirstName:      creds.FirstName,
 		LastName:       creds.LastName,
 		HashedPassword: hashedPassword,
-		Suspended:      true,
+		Suspended:      false,
+		Admin:          false,
 	}
 	collection.InsertOne(ctx, user)
 }
 
+// BUG: Get unauthorized error when trying to login with correct credentials
 func Signin(w http.ResponseWriter, r *http.Request) {
 	var creds LoginForm
 	// Get the JSON body and decode into credentials
@@ -146,6 +148,7 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// If the structure of the body is wrong, return an HTTP error
 		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"message":"Invalid request payload"}`))
 		return
 	}
 
@@ -155,6 +158,7 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	notFoundErr := collection.FindOne(ctx, bson.D{{"email", creds.Email}}).Decode(user)
 	if notFoundErr == mongo.ErrNoDocuments {
 		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"No account registered with this email"}`))
 		return
 	}
 
@@ -162,8 +166,17 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	// AND, if it is the same as the password we received, the we can move ahead
 	// if NOT, then we return an "Unauthorized" status
 	validPass := verifyPassword(user.HashedPassword, creds.Password)
-	if !validPass || user.Suspended { // if user is suspended do not issue token
+	if !validPass {
 		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"Incorrect password"}`))
+		return
+	}
+
+	// if user is suspended do not issue token
+	if user.Suspended {
+		fmt.Println("User is suspended")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"User is suspended"}`))
 		return
 	}
 
@@ -346,21 +359,21 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// publish to redis delete-user channel
 	// gateway will listen to this channel and delete user data from all services
 	// gateway will also delete user data from its own database
-	// status, user := authenticate(r)
-	// if status == http.StatusOK && user.Admin {
-	// var deleteUser DeleteForm
-	// // Get the JSON body and decode into credentials
-	// err := json.NewDecoder(r.Body).Decode(&deleteUser)
-	// if err != nil {
-	// 	// If the structure of the body is wrong, return an HTTP error
-	// 	w.WriteHeader(http.StatusBadRequest)
-	// 	return
-	// }
-	if err := rdb.Publish(context.Background(), "user-delete", "user ID").Err(); err != nil {
-		fmt.Println(err)
+	status, user := authenticate(r)
+	if status == http.StatusOK && user.Admin {
+		var deleteUser DeleteForm
+		// // Get the JSON body and decode into credentials
+		err := json.NewDecoder(r.Body).Decode(&deleteUser)
+		if err != nil {
+			// If the structure of the body is wrong, return an HTTP error
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if err := rdb.Publish(context.Background(), "user-delete", deleteUser.Id).Err(); err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
-	// } else {
-	// w.WriteHeader(http.StatusUnauthorized)
-	// return
-	// }
 }

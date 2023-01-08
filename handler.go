@@ -211,6 +211,7 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 		Name:    "token",
 		Value:   tokenString,
 		Expires: expirationTime,
+		Path:    "/",
 	})
 }
 
@@ -244,7 +245,7 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If user is not authorised then do not refresh token
+	// If user is not authorised i.e. suspended then do not refresh token
 	_, user := authenticate(r)
 	if user.Suspended {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -275,6 +276,7 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 		Name:    "token",
 		Value:   tokenString,
 		Expires: expirationTime,
+		Path:    "/",
 	})
 }
 
@@ -283,6 +285,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Expires: time.Now(),
+		Path:    "/",
 	})
 }
 
@@ -374,6 +377,17 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+}
+
+func Me(w http.ResponseWriter, r *http.Request) {
+	status, user := authenticate(r)
+	if status == http.StatusOK {
+		json.NewEncoder(w).Encode(user)
+	} else {
+		// w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(status)
 		return
 	}
 }

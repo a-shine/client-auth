@@ -16,6 +16,7 @@ func main() {
 	http.HandleFunc("/refresh", Refresh)
 	http.HandleFunc("/logout", Logout)
 	http.HandleFunc("/delete", DeleteUser)
+	http.HandleFunc("/me", Me)
 
 	// start the server on port 8000
 	log.Fatal(http.ListenAndServe(":8000", nil))

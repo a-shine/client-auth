@@ -86,6 +86,6 @@ func main() {
 	http.HandleFunc("/delete", deleteUser)
 	http.HandleFunc("/suspend", suspendUser)
 
-	log.Println("Starting server on port 8080...")
+	log.Println("Starting server on port 8000...")
 	log.Fatalln(http.ListenAndServe(":8000", nil))
 }

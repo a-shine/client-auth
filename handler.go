@@ -3,88 +3,25 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var collection *mongo.Collection
-var ctx = context.TODO()
-
-var rdb *redis.Client
-var maxExperiation time.Duration
-
-var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
-
-func initCache() {
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       0, // use default DB
-	})
+// Claim describes the structure of a JWT claim (this is the same payload as in the
+// https://github.com/a-shine/api-gateway repo which is what makes them compatible)
+type Claim struct {
+	Id string `json:"id"`
+	jwt.RegisteredClaims
 }
 
-func initMaxExperation() {
-	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
-	if err != nil {
-		panic(err)
-	}
-	maxExperiation = time.Duration(mins) * time.Minute
-}
-
-func initDb() {
-	mongoUri := "mongodb://" + os.Getenv("DB_USER") + ":" + os.Getenv("DB_PASSWORD") + "@" + os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT")
-	clientOptions := options.Client().ApplyURI(mongoUri)
-	client, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	collection = client.Database(os.Getenv("DB_NAME")).Collection("users")
-}
-
-// Hash and salt password
-func hashAndSalt(pwd string) string {
-	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return string(hash)
-}
-
-// Compare password with hash
-func verifyPassword(hashedPwd string, plainPwd string) bool {
-	byteHash := []byte(hashedPwd)
-	err := bcrypt.CompareHashAndPassword(byteHash, []byte(plainPwd))
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	return true
-}
-
-// Create a struct that models the structure of a user, both in the request body, and in the DB
-type LoginForm struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
-}
-
+// RegisterForm describes the expected json payload when a user registers
 type RegisterForm struct {
 	Password  string `json:"password"`
 	Email     string `json:"email"`
@@ -92,22 +29,112 @@ type RegisterForm struct {
 	LastName  string `json:"last_name"`
 }
 
-// Change claim to be associated with Id instead of username
-type Claims struct {
-	Id string `json:"id"`
-	jwt.RegisteredClaims
+// LoginForm describes the expected json payload when a user logs in
+type LoginForm struct {
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
+// SuspendForm describes the expected json payload when a user suspension request is made
 type SuspendForm struct {
 	Id string `json:"id"`
 }
 
-type DeleteForm struct {
-	Id string `json:"id"`
+// hashAndSalt hashes a provided password and returns the hashed password as a string
+func hashAndSalt(pwd string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		log.Println("Unable to hash password: ", err)
+		return "", err
+	}
+	return string(hash), nil
 }
 
-func Signup(w http.ResponseWriter, r *http.Request) {
+// verifyPassword compares a hashed password with the raw password
+func verifyPassword(hashedPwd string, plainPwd string) bool {
+	byteHash := []byte(hashedPwd)
+	err := bcrypt.CompareHashAndPassword(byteHash, []byte(plainPwd))
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func processClaim(r *http.Request) (int, *Claim) {
+	claim := &Claim{}
+
+	c, err := r.Cookie("token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return http.StatusUnauthorized, nil
+		}
+		return http.StatusBadRequest, nil
+	}
+	tknStr := c.Value
+
+	tkn, err := jwt.ParseWithClaims(tknStr, claim, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return http.StatusUnauthorized, nil
+		}
+		return http.StatusBadRequest, nil
+	}
+	if !tkn.Valid {
+		return http.StatusUnauthorized, nil
+	}
+
+	return http.StatusOK, claim
+}
+
+func authenticate(claim *Claim) (int, *User) {
+	user := &User{}
+
+	// Get user by the ID in the token claim payload
+	objID, _ := primitive.ObjectIDFromHex(claim.Id)
+	value := users.FindOne(ctx, bson.M{"_id": objID}).Decode(user)
+
+	// Check user if user can be authenticated
+	if value == mongo.ErrNoDocuments {
+		return http.StatusUnauthorized, user
+	} else {
+		return http.StatusOK, user
+	}
+}
+
+func authAndAuthorised(claim *Claim) (int, *User) {
+	code, user := authenticate(claim)
+	switch code {
+	case http.StatusOK:
+		if user.Suspended {
+			return http.StatusUnauthorized, nil
+		} else {
+			return http.StatusOK, user
+		}
+	default:
+		return code, nil
+	}
+}
+
+func authAndAuthorisedAdmin(claim *Claim) (int, *User) {
+	code, user := authAndAuthorised(claim)
+	switch code {
+	case http.StatusOK:
+		if user.Admin {
+			return http.StatusOK, user
+		} else {
+			return http.StatusUnauthorized, nil
+		}
+	default:
+		return code, nil
+	}
+}
+
+// register handler for user registration
+func register(w http.ResponseWriter, r *http.Request) {
 	var creds RegisterForm
+
 	// Get the JSON body and decode into credentials
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
@@ -118,16 +145,22 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 
 	// Check if user already exists
 	filter := bson.D{{"email", creds.Email}}
-	mongoErr := collection.FindOne(ctx, filter).Err()
+	mongoErr := users.FindOne(ctx, filter).Err()
 
 	if mongoErr != mongo.ErrNoDocuments {
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(`{"message":"An account with that email address is already registered"}`))
+		log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
+		return
+	}
+
+	// Hash user password before storing in database
+	hashedPassword, err := hashAndSalt(creds.Password)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	// Create user
-	hashedPassword := hashAndSalt(creds.Password)
 	user := &User{
 		Id:             primitive.NewObjectID(),
 		Email:          creds.Email,
@@ -137,57 +170,59 @@ func Signup(w http.ResponseWriter, r *http.Request) {
 		Suspended:      false,
 		Admin:          false,
 	}
-	collection.InsertOne(ctx, user)
+
+	// Insert user into database
+	_, err = users.InsertOne(ctx, user)
+	if err != nil {
+		log.Println("Unable to insert user into database: ", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Println(w.Write([]byte(`{"message":"Unable to register user"}`)))
+	}
 }
 
-// BUG: Get unauthorized error when trying to login with correct credentials
-func Signin(w http.ResponseWriter, r *http.Request) {
+// login handler for user login
+func login(w http.ResponseWriter, r *http.Request) {
 	var creds LoginForm
+
 	// Get the JSON body and decode into credentials
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		// If the structure of the body is wrong, return an HTTP error
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"message":"Invalid request payload"}`))
+		log.Println(w.Write([]byte(`{"message":"Invalid request payload"}`)))
 		return
 	}
 
-	// Get the expected password from our in memory map
-	// expectedPassword, ok := users[creds.Username]
+	// Get the user details from the database
 	user := &User{}
-	notFoundErr := collection.FindOne(ctx, bson.D{{"email", creds.Email}}).Decode(user)
+	notFoundErr := users.FindOne(ctx, bson.D{{"email", creds.Email}}).Decode(user)
 	if notFoundErr == mongo.ErrNoDocuments {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message":"No account registered with this email"}`))
+		log.Println(w.Write([]byte(`{"message":"No account registered with this email"}`)))
 		return
 	}
 
-	// If a password exists for the given user
-	// AND, if it is the same as the password we received, the we can move ahead
-	// if NOT, then we return an "Unauthorized" status
+	// Compare the provided password with the stored hashed password, if they do not match return an "Unauthorized"
+	// status and an incorrect password message
 	validPass := verifyPassword(user.HashedPassword, creds.Password)
 	if !validPass {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message":"Incorrect password"}`))
+		log.Println(w.Write([]byte(`{"message":"Incorrect password"}`)))
 		return
 	}
 
-	// if user is suspended do not issue token
+	// Check if user is suspended. If suspended, do not issue a token
 	if user.Suspended {
-		fmt.Println("User is suspended")
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message":"User is suspended"}`))
+		log.Println(w.Write([]byte(`{"message":"Account has been suspended"}`)))
 		return
 	}
 
-	// Declare the expiration time of the token
-	// here, we have kept it as 5 minutes
-	expMin, _ := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
-	mins := time.Duration(expMin) * time.Minute
-	expirationTime := time.Now().Add(mins)
-	// Create the JWT claims, which includes the username and expiry time
-	claims := &Claims{
-		// TODO: Change to Id
+	// Declare the expiration time of the token as determined by the maxJwtTokenExpiration variable
+	expirationTime := time.Now().Add(maxJwtTokenExpiration)
+
+	// Create the JWT claims, which includes the authenticated user ID and expiry time
+	claims := &Claim{
 		Id: user.Id.Hex(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			// In JWT, the expiry time is expressed as unix milliseconds
@@ -195,18 +230,20 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// Declare the token with the algorithm used for signing, and the claims
+	// Create the token with the HS256 algorithm used for signing, and the created claim
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
 	// Create the JWT string
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
 		// If there is an error in creating the JWT return an internal server error
+		log.Println("Unable to sign token: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Finally, we set the client cookie for "token" as the JWT we just generated
-	// we also set an expiry time which is the same as the token itself
+	// Finally, we set the client cookie for "token" as the JWT we just generated we also set an expiry time which is
+	// the same as the token itself
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Value:   tokenString,
@@ -215,56 +252,35 @@ func Signin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// TODO: Check with database
-func Refresh(w http.ResponseWriter, r *http.Request) {
-	// (BEGIN) The code uptil this point is the same as the first part of the `Welcome` route
-	c, err := r.Cookie("token")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	tknStr := c.Value
-	claims := &Claims{}
-	tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
-	})
-	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if !tkn.Valid {
-		w.WriteHeader(http.StatusUnauthorized)
+// refresh handler enabling authenticated non-suspended users to apply for new token lengthening their session. // If
+// unable to authenticate user or is not authorised (e.g. suspended) then do not refresh token
+func refresh(w http.ResponseWriter, r *http.Request) {
+	code, claim := processClaim(r)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+		log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
 		return
 	}
 
-	// If user is not authorised i.e. suspended then do not refresh token
-	_, user := authenticate(r)
-	if user.Suspended {
-		w.WriteHeader(http.StatusUnauthorized)
+	code, _ = authAndAuthorised(claim)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+		log.Println(w.Write([]byte(`{"message": "Unable to refresh token"}`)))
 		return
 	}
-	// (END) The code uptil this point is the same as the first part of the `Welcome` route
 
-	// We ensure that a new token is not issued until enough time has elapsed
-	// In this case, a new token will only be issued if the old token is within
-	// 30 seconds of expiry. Otherwise, return a bad request status
-	if time.Until(claims.ExpiresAt.Time) > 30*time.Second {
+	// We ensure that a new token is not issued until enough time has elapsed. In this case, a new token will only be
+	// issued if the old token is within 30 seconds of expiry. Otherwise, return a bad request status.
+	if time.Until(claim.ExpiresAt.Time) > 30*time.Second {
 		w.WriteHeader(http.StatusBadRequest)
+		log.Println(w.Write([]byte(`{"message": "Token still valid"}`)))
 		return
 	}
 
 	// Now, create a new token for the current use, with a renewed expiration time
 	expirationTime := time.Now().Add(5 * time.Minute)
-	claims.ExpiresAt = jwt.NewNumericDate(expirationTime)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	claim.ExpiresAt = jwt.NewNumericDate(expirationTime)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -280,8 +296,9 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
-	// immediately clear the token cookie
+// logout handler for user logout
+func logout(w http.ResponseWriter, _ *http.Request) {
+	// Immediately clear the token cookie by setting cookie expiry to now
 	http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Expires: time.Now(),
@@ -289,105 +306,95 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func isAuthorised(user *User) bool {
-	return !user.Suspended
-}
+// me handler for user details
+func me(w http.ResponseWriter, r *http.Request) {
+	code, claim := processClaim(r)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+		log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
+		return
+	}
 
-func authenticate(r *http.Request) (int, *User) {
-	user := &User{}
-	// (BEGIN) The code uptil this point is the same as the first part of the `Welcome` route
-	c, err := r.Cookie("token")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return http.StatusUnauthorized, user
+	status, user := authAndAuthorised(claim)
+	if status == http.StatusOK {
+		err := json.NewEncoder(w).Encode(user)
+		if err != nil {
+			log.Println("Unable to encode user: ", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-		return http.StatusBadRequest, user
-	}
-	tknStr := c.Value
-	claims := &Claims{}
-	tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
-	})
-	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			return http.StatusUnauthorized, user
-		}
-		return http.StatusBadRequest, user
-	}
-	if !tkn.Valid {
-		return http.StatusUnauthorized, user
-	}
-
-	// Check user is auth and active - get by id
-	// get user by id
-
-	objID, _ := primitive.ObjectIDFromHex(claims.Id)
-	value := collection.FindOne(ctx, bson.M{"_id": objID}).Decode(user)
-
-	if value == mongo.ErrNoDocuments || user.Suspended {
-		return http.StatusUnauthorized, user
 	} else {
-		return http.StatusOK, user
+		// w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(status)
+		return
 	}
-
 }
 
-// only admin can do this
-func SuspendUser(w http.ResponseWriter, r *http.Request) {
-	// add id to blacklist until token expires
-	status, user := authenticate(r)
-	if status == http.StatusOK && user.Admin {
+// deleteUser handler enables users to request for their data to be deleted. This communicates with the API Gateway
+// through a pubsub 'user-delete' channel. The API Gateway will then communicate with each of the services that
+// required authentication, so they can handle deletion of the user data they contain.
+func deleteUser(w http.ResponseWriter, r *http.Request) {
+	code, claim := processClaim(r)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+		log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
+		return
+	}
+
+	status, user := authAndAuthorised(claim)
+
+	// TODO: Have some feedback system to deal with failed user deletion job requests
+	// Make user deletion request to API Gateway requiring each authenticated service to delete user data
+	if status == http.StatusOK {
+		// Send delete signal to other Gateway (each authenticated service will deal with delete it its own way)
+		// Gateway will listen to this channel and ask each service to delete user data
+		if err := rdb.Publish(ctx, "user-delete", user.Id.Hex()).Err(); err != nil {
+			log.Println("Unable to publish to Redis: ", err)
+		}
+	} else {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Println(w.Write([]byte(`{"message": "Unable to authenticate user"}`)))
+		return
+	}
+
+	// Add ID to blacklist until token expires
+	if err := rdb.Set(ctx, claim.Id, claim.Id, time.Until(claim.ExpiresAt.Time)).Err(); err != nil {
+		log.Println("Unable to set blacklist: ", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	objID, _ := primitive.ObjectIDFromHex(claim.Id)
+	_, err := users.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil {
+		log.Println("Unable to delete user: ", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+// suspendUser is an only admin accessible handler for suspending a user
+func suspendUser(w http.ResponseWriter, r *http.Request) {
+	// Add ID to blacklist until token expires
+	code, claim := processClaim(r)
+	if code != http.StatusOK {
+		w.WriteHeader(code)
+		log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
+		return
+	}
+
+	status, _ := authAndAuthorisedAdmin(claim)
+
+	if status == http.StatusOK {
 		var suspendUser SuspendForm
 		// Get the JSON body and decode into credentials
 		err := json.NewDecoder(r.Body).Decode(&suspendUser)
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
 			w.WriteHeader(http.StatusBadRequest)
+			log.Println(w.Write([]byte(`{"message": "Invalid request body"}`)))
 			return
 		}
-		rdb.Set(context.Background(), suspendUser.Id, suspendUser.Id, maxExperiation)
-	}
-}
-
-// TODO
-// Make this service read the gateway.conf file to get the list of auth services
-// When user wishes to delete account, notify admin, admin can then delete user from all services by submitting the user id to this endpoint
-func DeleteUser(w http.ResponseWriter, r *http.Request) {
-	// send delete signal to other services (each service will deal with delete it its own way)
-	// add id to blacklist until token expires
-
-	// submit a user deletion job in the gateway? The gateway will periodically delete user data for each auth service
-	// Do this in the redis table?
-
-	// publish to redis delete-user channel
-	// gateway will listen to this channel and delete user data from all services
-	// gateway will also delete user data from its own database
-	status, user := authenticate(r)
-	if status == http.StatusOK && user.Admin {
-		var deleteUser DeleteForm
-		// // Get the JSON body and decode into credentials
-		err := json.NewDecoder(r.Body).Decode(&deleteUser)
-		if err != nil {
-			// If the structure of the body is wrong, return an HTTP error
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if err := rdb.Publish(context.Background(), "user-delete", deleteUser.Id).Err(); err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-}
-
-func Me(w http.ResponseWriter, r *http.Request) {
-	status, user := authenticate(r)
-	if status == http.StatusOK {
-		json.NewEncoder(w).Encode(user)
-	} else {
-		// w.WriteHeader(http.StatusUnauthorized)
-		w.WriteHeader(status)
-		return
+		rdb.Set(context.Background(), suspendUser.Id, suspendUser.Id, maxJwtTokenExpiration)
 	}
 }

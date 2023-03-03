@@ -1,23 +1,23 @@
 services:
-  # user-management:
-  #   build:
-  #     context: .
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - JWT_SECRET_KEY=secret
-  #     - JWT_TOKEN_EXP_MIN=60
-  #     - DB_HOST=user-db
-  #     - DB_PORT=27017
-  #     - DB_USER=root
-  #     - DB_PASSWORD=secret
-  #     - DB_NAME=user_management
-  #     - REDIS_HOST=user-cache
-  #     - REDIS_PORT=6379
-  #     - REDIS_PASSWORD=password123
-  #   depends_on:
-  #     - user-db
-  #     - user-cache
+  user-management:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET_KEY=secret
+      - JWT_TOKEN_EXP_MIN=60
+      - DB_HOST=user-db
+      - DB_PORT=27017
+      - DB_USER=root
+      - DB_PASSWORD=secret
+      - DB_NAME=user_management
+      - REDIS_HOST=user-cache
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=password123
+    depends_on:
+      - user-db
+      - user-cache
   user-management-test:
     build:
       context: .
@@ -53,12 +53,13 @@ services:
     command: /bin/sh -c "redis-server --requirepass $$REDIS_PASSWORD"
     environment:
       - REDIS_PASSWORD=password123
-#  db-gui:
-#    image: mongo-express
-#    ports:
-#      - "8081:8081"
-#    environment:
-#      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-#      ME_CONFIG_MONGODB_ADMINPASSWORD: secret
-#      ME_CONFIG_MONGODB_SERVER: user-db
-#    restart: always
+  # Debugging
+  db-gui:
+    image: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: secret
+      ME_CONFIG_MONGODB_SERVER: user-db
+    restart: always

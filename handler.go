@@ -26,8 +26,8 @@ type Claim struct {
 type RegisterForm struct {
 	Password  string `json:"password"`
 	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 // LoginForm describes the expected json payload when a user logs in
@@ -141,6 +141,7 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
 			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"message":"Invalid request payload"}`))
 			return
 		}
 
@@ -179,6 +180,8 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Println(w.Write([]byte(`{"message":"Unable to register user"}`)))
 		}
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"message":"User registered successfully"}`))
 	}
 }
 

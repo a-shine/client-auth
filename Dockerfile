@@ -22,4 +22,4 @@ COPY --from=build /user-auth /user-auth
 
 USER nonroot:nonroot
 
-ENTRYPOINT ["/user-auth"]
+CMD ["/user-auth"]

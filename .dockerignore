@@ -1,2 +1,4 @@
 Dockerfile
+Dockerfile.test
 docker-compose.yaml
+README.md

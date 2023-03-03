@@ -22,16 +22,7 @@ var dbUser = os.Getenv("DB_USER")
 var dbPassword = os.Getenv("DB_PASSWORD")
 var dbName = os.Getenv("DB_NAME")
 
-func main() {
-	// Get max expiration time of JWT token
-	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
-	if err != nil {
-		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
-	}
-	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
-
-	log.Println("Connecting to user database...")
-
+func getUserCollection() *mongo.Collection {
 	// Construct a connection string to the database
 	mongoUri := "mongodb://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort
 	clientOptions := options.Client().ApplyURI(mongoUri)
@@ -52,9 +43,10 @@ func main() {
 	}
 
 	// Get or create users collection
-	users := client.Database(dbName).Collection("users")
+	return client.Database(dbName).Collection("users")
+}
 
-	log.Println("Connecting to user cache...")
+func getCache() *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
 		Password: os.Getenv("REDIS_PASSWORD"),
@@ -63,7 +55,7 @@ func main() {
 
 	// Retry every 5 seconds
 	for {
-		_, err = rdb.Ping(context.Background()).Result()
+		_, err := rdb.Ping(context.Background()).Result()
 		if err != nil {
 			log.Println("Warning could not connect to Redis: ", err, "\r\nRetrying...")
 			time.Sleep(5 * time.Second)
@@ -72,6 +64,10 @@ func main() {
 		}
 	}
 
+	return rdb
+}
+
+func createHandler(users *mongo.Collection, rdb *redis.Client) *http.ServeMux {
 	// create an http handler
 	handler := http.NewServeMux()
 
@@ -83,6 +79,24 @@ func main() {
 	handler.HandleFunc("/delete", makeDeleteUserHandler(users, rdb))
 	handler.HandleFunc("/suspend", makeSuspendUser(users, rdb))
 
+	return handler
+}
+
+func main() {
+	// Get max expiration time of JWT token
+	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
+	if err != nil {
+		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
+	}
+	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
+
+	log.Println("Connecting to user database...")
+	users := getUserCollection()
+
+	log.Println("Connecting to user cache...")
+	rdb := getCache()
+
+	handler := createHandler(users, rdb)
 	log.Println("Starting server on port 8000...")
 	log.Fatalln(http.ListenAndServe(":8000", handler))
 }

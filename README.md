@@ -71,14 +71,19 @@ on how to configure this user management service and the [a-shine/api-gateway](h
 Registering a new user:
 
 ```bash
-curl -v -H "Content-type: application/json" -d '{"password": "secret", "email":"bob@myemail.com", "first_name":"Bob",
-"last_name":"Smith"}' localhost:8000/register
+curl -v \
+    -H "Content-type: application/json" \
+    -d '{"password": "secret", "email":"bob@myemail.com", "first_name":"Bob", "last_name":"Smith"}' \
+    localhost:8000/register
 ```
 
 Login to get a JWT:
 
 ```bash
-curl -v -H "Content-type: application/json" -d '{"password": "secret", "email":"bob@myemail.com"}' localhost:8000/login
+curl -v \
+     -H "Content-type: application/json" \
+     -d '{"password": "secret", "email":"bob@myemail.com"}'\
+     localhost:8000/login
 ```
 
 Refresh a JWT:

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +52,7 @@ func TestRegisterNewUser(t *testing.T) {
 
 	// Check if user is in the database
 	// Check if user already exists
-	filter := bson.D{{"email", newUserEmail}}
+	filter := bson.D{{Key: "email", Value: newUserEmail}}
 	mongoErr := users.FindOne(context.Background(), filter).Err()
 
 	if mongoErr == mongo.ErrNoDocuments {
@@ -73,12 +74,16 @@ func TestRegisterPreexistingUser(t *testing.T) {
 	gofakeit.Seed(0)
 	newUserEmail := gofakeit.Email()
 
-	users.InsertOne(context.Background(), bson.D{
-		{"email", newUserEmail},
-		{"password", "somePassword"},
-		{"firstName", "John"},
-		{"lastName", "Smith"},
+	_, err := users.InsertOne(context.Background(), bson.D{
+		{Key: "email", Value: newUserEmail},
+		{Key: "password", Value: "somePassword"},
+		{Key: "firstName", Value: "John"},
+		{Key: "lastName", Value: "Smith"},
 	})
+
+	if err != nil {
+		t.Error(err)
+	}
 
 	handler := createHandler(users, rdb)
 
@@ -130,5 +135,35 @@ func TestInvalidRegisterPayload(t *testing.T) {
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Error("Endpoint did not return correct status code")
+	}
+}
+
+func TestRegister(t *testing.T) {
+	handler := createHandler(getUserCollection(), getCache())
+	data := map[string]string{
+		"password":   "secret",
+		"email":      "bob@myemail.com",
+		"first_name": "Bob",
+		"last_name":  "Smith",
+	}
+	buf, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// convert map to json
+	body := strings.NewReader(string(buf))
+	req, err := http.NewRequest("POST", "/register", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf(
+			"handler returned wrong status code: got %v want %v",
+			status,
+			http.StatusOK,
+		)
 	}
 }

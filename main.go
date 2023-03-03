@@ -22,7 +22,31 @@ var dbUser = os.Getenv("DB_USER")
 var dbPassword = os.Getenv("DB_PASSWORD")
 var dbName = os.Getenv("DB_NAME")
 
+func createHandler(users *mongo.Collection, rdb *redis.Client) *http.ServeMux {
+	// create an http handler
+	handler := http.NewServeMux()
+
+	handler.HandleFunc("/register", makeRegisterHandler(users))
+	handler.HandleFunc("/login", makeLoginHandler(users))
+	handler.HandleFunc("/refresh", makeRefreshHandler(users))
+	handler.HandleFunc("/logout", makeLogoutHandler())
+	handler.HandleFunc("/me", makeMeHandler(users))
+	handler.HandleFunc("/delete", makeDeleteUserHandler(users, rdb))
+	handler.HandleFunc("/suspend", makeSuspendUser(users, rdb))
+
+	return handler
+}
+
 func getUserCollection() *mongo.Collection {
+	// Get max expiration time of JWT token
+	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
+	if err != nil {
+		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
+	}
+	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
+
+	log.Println("Connecting to user database...")
+
 	// Construct a connection string to the database
 	mongoUri := "mongodb://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort
 	clientOptions := options.Client().ApplyURI(mongoUri)
@@ -65,21 +89,6 @@ func getCache() *redis.Client {
 	}
 
 	return rdb
-}
-
-func createHandler(users *mongo.Collection, rdb *redis.Client) *http.ServeMux {
-	// create an http handler
-	handler := http.NewServeMux()
-
-	handler.HandleFunc("/register", makeRegisterHandler(users))
-	handler.HandleFunc("/login", makeLoginHandler(users))
-	handler.HandleFunc("/refresh", makeRefreshHandler(users))
-	handler.HandleFunc("/logout", makeLogoutHandler())
-	handler.HandleFunc("/me", makeMeHandler(users))
-	handler.HandleFunc("/delete", makeDeleteUserHandler(users, rdb))
-	handler.HandleFunc("/suspend", makeSuspendUser(users, rdb))
-
-	return handler
 }
 
 func main() {

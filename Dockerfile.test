@@ -1,0 +1,11 @@
+FROM golang:1.19
+
+WORKDIR /testing
+
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
+
+COPY *.go ./
+
+ENTRYPOINT ["go test"]

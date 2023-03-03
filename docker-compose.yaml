@@ -1,7 +1,27 @@
 services:
-  user-management:
+  # user-management:
+  #   build:
+  #     context: .
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - JWT_SECRET_KEY=secret
+  #     - JWT_TOKEN_EXP_MIN=60
+  #     - DB_HOST=user-db
+  #     - DB_PORT=27017
+  #     - DB_USER=root
+  #     - DB_PASSWORD=secret
+  #     - DB_NAME=user_management
+  #     - REDIS_HOST=user-cache
+  #     - REDIS_PORT=6379
+  #     - REDIS_PASSWORD=password123
+  #   depends_on:
+  #     - user-db
+  #     - user-cache
+  user-management-test:
     build:
       context: .
+      dockerfile: ./Dockerfile.test
     ports:
       - "8000:8000"
     environment:

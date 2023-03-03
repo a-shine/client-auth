@@ -9,5 +9,5 @@ type User struct {
 	LastName       string             `bson:"last_name" json:"lastName"`
 	HashedPassword string             `bson:"hashed_password" json:"-"`
 	Suspended      bool               `bson:"suspended" json:"-"`
-	Admin          bool               `bson:"admin" json:"-"`
+	Groups         []string           `bson:"groups" json:"groups"`
 }

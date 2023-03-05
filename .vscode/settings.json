@@ -1,11 +1,10 @@
 {
-    "editor.formatOnSave": true,
-    "editor.wordWrap": "off",
-    "editor.rulers": [
-        80,
-        120
-    ],
-    "cSpell.words": [
-        "Authorised"
-    ]
+  "editor.formatOnSave": true,
+  "editor.wordWrap": "off",
+  "editor.rulers": [80, 120],
+  "cSpell.words": [
+    "Authorised",
+    "bson",
+    "gofakeit"
+  ]
 }

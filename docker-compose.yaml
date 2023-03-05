@@ -22,8 +22,6 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile.test
-    ports:
-      - "8000:8000"
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60

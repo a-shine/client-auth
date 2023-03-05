@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.2
-	go.mongodb.org/mongo-driver v1.11.1
+	go.mongodb.org/mongo-driver v1.11.2
 	golang.org/x/crypto v0.4.0
 )
 

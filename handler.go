@@ -131,11 +131,12 @@ func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *User) 
 	}
 }
 
-// register handler for user registration
+// makeRegisterHandler registers handler function for user registration endpoint
 func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var creds RegisterForm
 
+		// BUG: Does not check for missing fields
 		// Get the JSON body and decode into credentials
 		err := json.NewDecoder(r.Body).Decode(&creds)
 		if err != nil {
@@ -146,7 +147,7 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 		}
 
 		// Check if user already exists
-		filter := bson.D{{"email", creds.Email}}
+		filter := bson.D{{Key: "email", Value: creds.Email}}
 		mongoErr := users.FindOne(context.Background(), filter).Err()
 
 		if mongoErr != mongo.ErrNoDocuments {
@@ -201,7 +202,7 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 
 		// Get the user details from the database
 		user := &User{}
-		notFoundErr := users.FindOne(context.Background(), bson.D{{"email", creds.Email}}).Decode(user)
+		notFoundErr := users.FindOne(context.Background(), bson.D{{Key: "email", Value: creds.Email}}).Decode(user)
 		if notFoundErr == mongo.ErrNoDocuments {
 			w.WriteHeader(http.StatusUnauthorized)
 			log.Println(w.Write([]byte(`{"message":"No account registered with this email"}`)))

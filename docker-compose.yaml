@@ -1,5 +1,5 @@
 services:
-  user-management:
+  client-authentication:
     build:
       context: .
     ports:
@@ -7,36 +7,36 @@ services:
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60
-      - DB_HOST=user-db
+      - DB_HOST=client-db
       - DB_PORT=27017
       - DB_USER=root
       - DB_PASSWORD=secret
       - DB_NAME=user_management
-      - REDIS_HOST=user-cache
+      - REDIS_HOST=client-auth-cache
       - REDIS_PORT=6379
       - REDIS_PASSWORD=password123
     depends_on:
-      - user-db
-      - user-cache
-  user-management-test:
+      - client-db
+      - client-auth-cache
+  client-authentication-test:
     build:
       context: .
       dockerfile: ./Dockerfile.test
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60
-      - DB_HOST=user-db
+      - DB_HOST=client-db
       - DB_PORT=27017
       - DB_USER=root
       - DB_PASSWORD=secret
       - DB_NAME=user_management
-      - REDIS_HOST=user-cache
+      - REDIS_HOST=client-auth-cache
       - REDIS_PORT=6379
       - REDIS_PASSWORD=password123
     depends_on:
-      - user-db
-      - user-cache
-  user-db:
+      - client-db
+      - client-auth-cache
+  client-db:
     image: mongo
     ports:
       - "27017:27017"
@@ -44,7 +44,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=secret
       - MONGO_INITDB_DATABASE=user_management
-  user-cache:
+  client-auth-cache:
     image: redis
     ports:
       - 6379:6379

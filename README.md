@@ -53,8 +53,8 @@ services:
     - REDIS_PORT=6379
     - REDIS_PASSWORD=password123
   depends_on:
-    - user-db
-    - user-cache
+    - client-db
+    - client-auth-cache
   client-db:
     image: mongo
     ports:

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,10 +26,10 @@ type Claim struct {
 
 // RegisterForm describes the expected json payload when a user registers
 type RegisterForm struct {
-	Password  string `json:"password"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	Password  string `json:"password" validate:"required"`
+	Email     string `json:"email" validate:"required,email"`
+	FirstName string `json:"firstName" validate:"required"`
+	LastName  string `json:"lastName" validate:"required"`
 }
 
 // LoginForm describes the expected json payload when a user logs in
@@ -133,7 +134,7 @@ func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *Client
 }
 
 // makeRegisterHandler registers handler function for user registration endpoint
-func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
+func makeRegisterHandler(users *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var creds RegisterForm
 
@@ -148,6 +149,12 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 		}
 
 		// validate json schema
+		err = validate.Struct(creds)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
+			return
+		}
 
 		// Check if user already exists
 		filter := bson.D{{Key: "email", Value: creds.Email}}

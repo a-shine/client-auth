@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -71,7 +72,9 @@ func createHandler(users *mongo.Collection, rdb *redis.Client) *http.ServeMux {
 	// create an http handler
 	handler := http.NewServeMux()
 
-	handler.HandleFunc("/register", makeRegisterHandler(users))
+	validate := validator.New()
+
+	handler.HandleFunc("/register", makeRegisterHandler(users, validate))
 	handler.HandleFunc("/login", makeLoginHandler(users))
 	handler.HandleFunc("/refresh", makeRefreshHandler(users))
 	handler.HandleFunc("/logout", makeLogoutHandler())

@@ -11,15 +11,15 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build -o /user-auth
+RUN go build -o /client-authentication
 
 ## Deploy
 FROM gcr.io/distroless/base-debian10
 
 WORKDIR /
 
-COPY --from=build /user-auth /user-auth
+COPY --from=build /client-authentication /client-authentication
 
 USER nonroot:nonroot
 
-CMD ["/user-auth"]
+CMD ["/client-authentication"]

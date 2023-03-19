@@ -102,14 +102,14 @@ func TestInvalidRegisterPayload(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	// New user json with missing firstName field
-	// BUG: This should be an invalid payload, but it is not
-	// user := `{"email": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
+	// BUG: This should be an invalid payload (missing firstName field), but it is not
+	user := `{"email": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
 
 	// New user json with misspelled email field
 	// user = `{"emal": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
 
 	// Create a new request
-	req, _ := http.NewRequest("POST", "/register", strings.NewReader(""))
+	req, _ := http.NewRequest("POST", "/register", strings.NewReader(user))
 
 	// Send request to service
 	handler.ServeHTTP(recorder, req)

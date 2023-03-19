@@ -33,8 +33,8 @@ type RegisterForm struct {
 
 // LoginForm describes the expected json payload when a user logs in
 type LoginForm struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Password string `json:"password" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
 }
 
 // SuspendForm describes the expected json payload when a user suspension request is made

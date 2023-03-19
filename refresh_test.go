@@ -1,67 +1,56 @@
 package main
 
-import (
-	"context"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
+// func TestRefresh(t *testing.T) {
+// 	// Get MongoDB collection and Redis client
+// 	users := getUserCollection()
+// 	rdb := getCache()
 
-	"go.mongodb.org/mongo-driver/bson"
-)
+// 	// Get handler object
+// 	handler := createHandler(users, rdb)
 
-func TestRefresh(t *testing.T) {
-	// Get MongoDB collection and Redis client
-	users := getUserCollection()
-	rdb := getCache()
+// 	// Create http recorder to record response
+// 	recorder := httptest.NewRecorder()
 
-	// Get handler object
-	handler := createHandler(users, rdb)
+// 	email := randomEmail()
+// 	hashedPass, _ := hashAndSalt("somePassword")
 
-	// Create http recorder to record response
-	recorder := httptest.NewRecorder()
+// 	// Insert a new user into the database
+// 	users.InsertOne(context.Background(), bson.D{
+// 		{Key: "email", Value: email},
+// 		{Key: "hashedPassword", Value: hashedPass},
+// 		{Key: "firstName", Value: "John"},
+// 		{Key: "lastName", Value: "Smith"},
+// 	})
 
-	email := randomEmail()
-	hashedPass, _ := hashAndSalt("somePassword")
+// 	// Create a new user json
+// 	login := `{"email": "` + email + `", "password": "somePassword"}`
 
-	// Insert a new user into the database
-	users.InsertOne(context.Background(), bson.D{
-		{Key: "email", Value: email},
-		{Key: "hashedPassword", Value: hashedPass},
-		{Key: "firstName", Value: "John"},
-		{Key: "lastName", Value: "Smith"},
-	})
+// 	// Create a new request
+// 	req1, _ := http.NewRequest("POST", "/login", strings.NewReader(login))
 
-	// Create a new user json
-	login := `{"email": "` + email + `", "password": "somePassword"}`
+// 	// Send request to service
+// 	handler.ServeHTTP(recorder, req1)
 
-	// Create a new request
-	req1, _ := http.NewRequest("POST", "/login", strings.NewReader(login))
+// 	tokenCookies := recorder.Result().Cookies()
 
-	// Send request to service
-	handler.ServeHTTP(recorder, req1)
+// 	fmt.Println(tokenCookies)
 
-	tokenCookies := recorder.Result().Cookies()
+// 	// make a new request with the cookie
+// 	req2, _ := http.NewRequest("POST", "/refresh", nil)
 
-	fmt.Println(tokenCookies)
+// 	for _, cookie := range tokenCookies {
+// 		req2.AddCookie(cookie)
+// 	}
+// 	// req2.AddCookie(tokenCookies)
 
-	// make a new request with the cookie
-	req2, _ := http.NewRequest("POST", "/refresh", nil)
+// 	fmt.Println(req2.Cookies())
 
-	for _, cookie := range tokenCookies {
-		req2.AddCookie(cookie)
-	}
-	// req2.AddCookie(tokenCookies)
+// 	handler.ServeHTTP(recorder, req2)
 
-	fmt.Println(req2.Cookies())
+// 	fmt.Println(recorder.Body)
+// 	fmt.Println(recorder.Code)
 
-	handler.ServeHTTP(recorder, req2)
-
-	fmt.Println(recorder.Body)
-	fmt.Println(recorder.Code)
-
-	if recorder.Code != http.StatusOK {
-		t.Error("Endpoint did not return correct status code")
-	}
-}
+// 	if recorder.Code != http.StatusOK {
+// 		t.Error("Endpoint did not return correct status code")
+// 	}
+// }

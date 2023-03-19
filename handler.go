@@ -18,7 +18,8 @@ import (
 // Claim describes the structure of a JWT claim (this is the same payload as in the
 // https://github.com/a-shine/api-gateway repo which is what makes them compatible)
 type Claim struct {
-	Id string `json:"id"`
+	Id     string   `json:"id"`
+	Groups []string `json:"groups"` // TODO: Use this to check if user is admin, allows groups to be verified by the API gateway
 	jwt.RegisteredClaims
 }
 
@@ -86,8 +87,8 @@ func processClaim(r *http.Request) (int, *Claim) {
 	return http.StatusOK, claim
 }
 
-func authenticate(users *mongo.Collection, claim *Claim) (int, *User) {
-	user := &User{}
+func authenticate(users *mongo.Collection, claim *Claim) (int, *Client) {
+	user := &Client{}
 
 	// Get user by the ID in the token claim payload
 	objID, _ := primitive.ObjectIDFromHex(claim.Id)
@@ -101,7 +102,7 @@ func authenticate(users *mongo.Collection, claim *Claim) (int, *User) {
 	}
 }
 
-func authAndAuthorised(users *mongo.Collection, claim *Claim) (int, *User) {
+func authAndAuthorised(users *mongo.Collection, claim *Claim) (int, *Client) {
 	code, user := authenticate(users, claim)
 	switch code {
 	case http.StatusOK:
@@ -115,7 +116,7 @@ func authAndAuthorised(users *mongo.Collection, claim *Claim) (int, *User) {
 	}
 }
 
-func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *User) {
+func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *Client) {
 	code, user := authAndAuthorised(users, claim)
 	switch code {
 	case http.StatusOK:
@@ -142,9 +143,11 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 		if err != nil {
 			// If the structure of the body is wrong, return an HTTP error
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"message":"Invalid request payload"}`))
+			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
 			return
 		}
+
+		// validate json schema
 
 		// Check if user already exists
 		filter := bson.D{{Key: "email", Value: creds.Email}}
@@ -164,7 +167,7 @@ func makeRegisterHandler(users *mongo.Collection) http.HandlerFunc {
 		}
 
 		// Create user
-		user := &User{
+		user := &Client{
 			Id:             primitive.NewObjectID(),
 			Email:          creds.Email,
 			FirstName:      creds.FirstName,
@@ -201,7 +204,7 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 		}
 
 		// Get the user details from the database
-		user := &User{}
+		user := &Client{}
 		notFoundErr := users.FindOne(context.Background(), bson.D{{Key: "email", Value: creds.Email}}).Decode(user)
 		if notFoundErr == mongo.ErrNoDocuments {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -230,7 +233,8 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 
 		// Create the JWT claims, which includes the authenticated user ID and expiry time
 		claims := &Claim{
-			Id: user.Id.Hex(),
+			Id:     user.Id.Hex(),
+			Groups: user.Groups,
 			RegisteredClaims: jwt.RegisteredClaims{
 				// In JWT, the expiry time is expressed as unix milliseconds
 				ExpiresAt: jwt.NewNumericDate(expirationTime),
@@ -260,6 +264,7 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 	}
 }
 
+// Refresh is called by frontend when 401 is received it is a way of authenticating user and extending their session without the need for them to input there credentials again but also checks that they are still authorised to use the system
 // refresh handler enabling authenticated non-suspended users to apply for new token lengthening their session. // If
 // unable to authenticate user or is not authorised (e.g. suspended) then do not refresh token
 func makeRefreshHandler(users *mongo.Collection) http.HandlerFunc {
@@ -344,6 +349,7 @@ func makeMeHandler(users *mongo.Collection) http.HandlerFunc {
 	}
 }
 
+// DO NOT DELETE USERS DIRECTLY FROM THE DATABASE. INSTEAD, USE THE DELETE USER HANDLER (NEEDS TO TRICKLE DOWN TO ALL SERVICES)
 // deleteUser handler enables users to request for their data to be deleted. This communicates with the API Gateway
 // through a pubsub 'user-delete' channel. The API Gateway will then communicate with each of the services that
 // required authentication, so they can handle deletion of the user data they contain.

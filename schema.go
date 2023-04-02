@@ -6,14 +6,17 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 // and bots) must have an email address and a hashed password.
 
 type Client struct {
-	Id             primitive.ObjectID `bson:"_id" json:"-"`
-	Email          string             `bson:"email" json:"email" validate:"required,email"`
-	HashedPassword string             `bson:"hashedPassword" json:"-" validate:"required"`
+	// Required fields for all clients
+	Id        primitive.ObjectID `bson:"_id," json:"-"`
+	Email     string             `bson:"email" json:"email"`
+	Suspended bool               `bson:"suspended" json:"-"`
+	Groups    []string           `bson:"groups" json:"groups"`
 
-	Suspended bool     `bson:"suspended" json:"-"`
-	Groups    []string `bson:"groups" json:"groups"`
+	// If the client is a person, then the following fields are required
+	FirstName      string `bson:"firstName, omitempty" json:"firstName"`
+	LastName       string `bson:"lastName, omitempty" json:"lastName"`
+	HashedPassword string `bson:"hashedPassword, omitempty" json:"-"`
 
-	// If the client is a person, then the following fields are required.
-	FirstName string `bson:"firstName" json:"firstName"`
-	LastName  string `bson:"lastName" json:"lastName"`
+	// If the client is a service, then the following fields are required
+	Name string `bson:"name, omitempty" json:"name"`
 }

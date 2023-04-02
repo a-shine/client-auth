@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,10 +30,10 @@ func TestRegisterNewUser(t *testing.T) {
 	newUserEmail := gofakeit.Email()
 
 	// Create a new user json
-	user := `{"email": "` + newUserEmail + `", "password": "somePassword", "firstName": "John", "lastName": "Smith"}`
+	user := `{"email": "` + newUserEmail + `", "password": "somePassword", "firstName": "John", "lastName": "Smith", "groups": ["admin"]}`
 
 	// Create a new request
-	req, _ := http.NewRequest("POST", "/register", strings.NewReader(user))
+	req, _ := http.NewRequest("POST", "/register-user", strings.NewReader(user))
 
 	// Send request to service
 	handler.ServeHTTP(recorder, req)
@@ -49,6 +50,46 @@ func TestRegisterNewUser(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Error("Endpoint did not return correct status code")
 	}
+}
+
+func TestSuccessfulServiceRegistration(t *testing.T) {
+	// Get MongoDB collection and Redis client
+	users := getUserCollection()
+	rdb := getCache()
+
+	// Get handler object
+	handler := createHandler(users, rdb)
+
+	// Create http recorder to record response
+	recorder := httptest.NewRecorder()
+
+	// Generate a new unique user email
+	gofakeit.Seed(0)
+	newUserEmail := gofakeit.Email()
+
+	// Create a new user json
+	servicePayload := `{"email": "` + newUserEmail + `", "name": "Service A", "groups": ["tempProbes"]}`
+
+	// Create a new request
+	req, _ := http.NewRequest("POST", "/register-service", strings.NewReader(servicePayload))
+
+	// Send request to service
+	handler.ServeHTTP(recorder, req)
+
+	// Check if user is indeed inserted into the database
+	filter := bson.D{{Key: "email", Value: newUserEmail}}
+	mongoErr := users.FindOne(context.Background(), filter).Err()
+
+	if mongoErr == mongo.ErrNoDocuments {
+		t.Error("Service was not added to database")
+	}
+
+	// Check if user creation response is sent to the client
+	if recorder.Code != http.StatusCreated {
+		t.Error("Endpoint did not return correct status code")
+	}
+
+	fmt.Println(recorder.Body.String())
 }
 
 // Test case for attempting to register a user that already exists
@@ -76,10 +117,10 @@ func TestRegisterPreexistingUser(t *testing.T) {
 	})
 
 	// New user json with same email as the pre-inserted user
-	user := `{"email": "` + newUserEmail + `", "password": "somePassword", "firstName": "John", "lastName": "Smith"}`
+	user := `{"email": "` + newUserEmail + `", "password": "somePassword", "firstName": "John", "lastName": "Smith", "groups": ["admin"]}`
 
 	// Create a new request
-	req, _ := http.NewRequest("POST", "/register", strings.NewReader(user))
+	req, _ := http.NewRequest("POST", "/register-user", strings.NewReader(user))
 
 	// Send request to service
 	handler.ServeHTTP(recorder, req)
@@ -102,14 +143,13 @@ func TestInvalidRegisterPayload(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	// New user json with missing firstName field
-	// BUG: This should be an invalid payload (missing firstName field), but it is not
-	user := `{"email": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
+	user := `{"email": "john@smith.com", "password": "somePassword", "lastName": "Smith", "groups": ["admin"]}`
 
 	// New user json with misspelled email field
 	// user = `{"emal": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
 
 	// Create a new request
-	req, _ := http.NewRequest("POST", "/register", strings.NewReader(user))
+	req, _ := http.NewRequest("POST", "/register-user", strings.NewReader(user))
 
 	// Send request to service
 	handler.ServeHTTP(recorder, req)

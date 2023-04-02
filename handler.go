@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,6 +17,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TODO: Add validation to all JSON payloads
+// TODO: Finish tests
+
 // Claim describes the structure of a JWT claim (this is the same payload as in the
 // https://github.com/a-shine/api-gateway repo which is what makes them compatible)
 type Claim struct {
@@ -24,12 +28,19 @@ type Claim struct {
 	jwt.RegisteredClaims
 }
 
-// RegisterForm describes the expected json payload when a user registers
-type RegisterForm struct {
-	Password  string `json:"password" validate:"required"`
-	Email     string `json:"email" validate:"required,email"`
-	FirstName string `json:"firstName" validate:"required"`
-	LastName  string `json:"lastName" validate:"required"`
+// UserRegistrationForm describes the expected json payload when a user registers
+type UserRegistrationForm struct {
+	Password  string   `json:"password" validate:"required,min=8,max=64"`
+	Email     string   `json:"email" validate:"required,email"`
+	FirstName string   `json:"firstName" validate:"required"`
+	LastName  string   `json:"lastName" validate:"required"`
+	Groups    []string `json:"groups" validate:"required"`
+}
+
+type ServiceRegistrationForm struct {
+	Email  string   `json:"email" validate:"required,email"`
+	Name   string   `json:"name" validate:"required"`
+	Groups []string `json:"groups" validate:"required"`
 }
 
 // LoginForm describes the expected json payload when a user logs in
@@ -133,12 +144,89 @@ func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *Client
 	}
 }
 
-// makeRegisterHandler registers handler function for user registration endpoint
-func makeRegisterHandler(users *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var creds RegisterForm
+// Needs to be a jwt token so that the API gateway can verify it
+func generateAPIClientToken(client *Client) *jwt.Token {
+	// Create the JWT claims, which includes the user ID with no expiration time
+	claims := &Claim{
+		Id:               client.Id.Hex(),
+		RegisteredClaims: jwt.RegisteredClaims{},
+	}
+	// Create the JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token
 
-		// BUG: Does not check for missing fields
+}
+
+// makeUserRegistrationHandler handles the registration of a new service. A
+// service is a type of client, unlike a user, that interacts programmatically
+// with the backend. A service is not a user and therefore does not have a
+// password, first name, last name, etc. The handler returns a JWT token that
+// does not expire and is used to authenticate the service.
+func makeServiceRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var creds ServiceRegistrationForm
+
+		// Get the JSON body and decode into credentials
+		err := json.NewDecoder(r.Body).Decode(&creds)
+		if err != nil {
+			// If the structure of the body is wrong, return an HTTP error
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
+			return
+		}
+
+		// Validate JSON schema
+		err = validate.Struct(creds)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"message":"Invalid payload fields"}`))
+			return
+		}
+
+		// Check if service already registered
+		filter := bson.D{{Key: "email", Value: creds.Email}}
+		mongoErr := clients.FindOne(context.Background(), filter).Err()
+		if mongoErr != mongo.ErrNoDocuments {
+			w.WriteHeader(http.StatusConflict)
+			log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
+			return
+		}
+
+		// Create new client
+		service := &Client{
+			Id:        primitive.NewObjectID(),
+			Email:     creds.Email,
+			Name:      creds.Name,
+			Groups:    creds.Groups,
+			Suspended: false,
+		}
+
+		// Insert user into database
+		_, err = clients.InsertOne(context.Background(), service)
+		if err != nil {
+			log.Println("Unable to insert service into database: ", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Println(w.Write([]byte(`{"message":"Unable to register user"}`)))
+		}
+
+		// If client exists generate a new token
+		// BUG: Potentially not returning the correct api token
+		apiToken := generateAPIClientToken(service)
+
+		fmt.Println(apiToken.Claims)
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(apiToken.Raw))
+	}
+}
+
+// makeUserRegistrationHandler registers handler function for client registration endpoint
+// If client is a user a password, first name and last name are required
+// If a client is a service (IoT device) only an email is required (the email serves as the unique identifier)
+func makeUserRegistrationHandler(users *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var creds UserRegistrationForm
+
 		// Get the JSON body and decode into credentials
 		err := json.NewDecoder(r.Body).Decode(&creds)
 		if err != nil {
@@ -181,7 +269,7 @@ func makeRegisterHandler(users *mongo.Collection, validate *validator.Validate) 
 			LastName:       creds.LastName,
 			HashedPassword: hashedPassword,
 			Suspended:      false,
-			Groups:         []string{},
+			Groups:         creds.Groups,
 		}
 
 		// Insert user into database

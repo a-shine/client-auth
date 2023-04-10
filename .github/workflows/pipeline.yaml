@@ -15,10 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Start test environment
-        uses: isbang/compose-action@v1.4.1
+        uses: adambirds/docker-compose-action@v1.1.0
         with:
           compose-file: "./docker-compose.yml"
-          services: client-auth-test # if output is not PASS, send signal to fail the job
+          # services: client-auth-test # if output is not PASS, send signal to fail the job
+          test-container: client-auth-test
   # build:
   #   runs-on: ubuntu-latest
   #   steps:

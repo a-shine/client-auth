@@ -18,7 +18,6 @@ jobs:
         uses: adambirds/docker-compose-action@v1.1.0
         with:
           compose-file: "./docker-compose.yml"
-          # services: client-auth-test # if output is not PASS, send signal to fail the job
           test-container: client-auth-test
           test-command: "go test"
   # build:

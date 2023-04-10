@@ -31,7 +31,7 @@ services:
   client-auth-test:
     build:
       context: .
-      dockerfile: ./Dockerfile.test
+      dockerfile: ./Dockerfile.dev
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60

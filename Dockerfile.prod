@@ -1,6 +1,4 @@
 # syntax=docker/dockerfile:1
-
-## Build
 FROM golang:1.19 AS build
 
 WORKDIR /app
@@ -11,15 +9,16 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build -o /client-authentication
+RUN go build -o /client-auth
 
-## Deploy
+# Build lightweight (only contains binary and minimal OS) container for 
+# production 
 FROM gcr.io/distroless/base-debian10
 
 WORKDIR /
 
-COPY --from=build /client-authentication /client-authentication
+COPY --from=build /client-auth /client-auth
 
 USER nonroot:nonroot
 
-CMD ["/client-authentication"]
+CMD ["/client-auth"]

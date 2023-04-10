@@ -18,7 +18,7 @@ import (
 var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 var maxJwtTokenExpiration time.Duration
 
-func getUserCollection() *mongo.Collection {
+func getClientCollection() *mongo.Collection {
 	// Getting env variables for connecting to database
 	var dbHost = os.Getenv("DB_HOST")
 	var dbPort = os.Getenv("DB_PORT")
@@ -91,7 +91,7 @@ func createHandler(clients *mongo.Collection, rdb *redis.Client) *http.ServeMux 
 
 	handler.HandleFunc("/me", makeMeHandler(clients))
 	handler.HandleFunc("/delete", makeDeleteUserHandler(clients, rdb))
-	handler.HandleFunc("/suspend", makeSuspendUser(clients, rdb))
+	handler.HandleFunc("/suspend", makeSuspendClient(clients, rdb))
 
 	return handler
 }
@@ -105,7 +105,7 @@ func main() {
 	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
 
 	log.Println("Connecting to user database...")
-	users := getUserCollection()
+	users := getClientCollection()
 
 	log.Println("Connecting to user cache...")
 	rdb := getCache()

@@ -118,5 +118,5 @@ The test image is built within the `docker-compose.yaml` build process.
 To run the tests locally:
 
 ```bash
-docker-compose run user-management-test go test
+docker-compose run client-auth-test go test
 ```

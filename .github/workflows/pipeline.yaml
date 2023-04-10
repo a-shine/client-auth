@@ -20,6 +20,7 @@ jobs:
           compose-file: "./docker-compose.yml"
           # services: client-auth-test # if output is not PASS, send signal to fail the job
           test-container: client-auth-test
+          test-command: "go test"
   # build:
   #   runs-on: ubuntu-latest
   #   steps:

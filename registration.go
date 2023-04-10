@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -30,7 +27,7 @@ type ServiceRegistrationForm struct {
 // makeUserRegistrationHandler registers handler function for client registration endpoint
 // If client is a user a password, first name and last name are required
 // If a client is a service (IoT device) only an email is required (the email serves as the unique identifier)
-func makeUserRegistrationHandler(users *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
+func makeUserRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var creds UserRegistrationForm
 
@@ -52,40 +49,18 @@ func makeUserRegistrationHandler(users *mongo.Collection, validate *validator.Va
 		}
 
 		// Check if user already exists
-		filter := bson.D{{Key: "email", Value: creds.Email}}
-		mongoErr := users.FindOne(context.Background(), filter).Err()
-
-		if mongoErr != mongo.ErrNoDocuments {
+		if clientExists(clients, creds.Email) {
 			w.WriteHeader(http.StatusConflict)
 			log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
 			return
 		}
 
-		// Hash user password before storing in database
-		hashedPassword, err := hashAndSalt(creds.Password)
+		err = createNewUserClient(clients, creds.Email, creds.Password, creds.FirstName, creds.LastName, creds.Groups)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			return
+			w.Write([]byte(`{"message":"Unable to register user"}`))
 		}
 
-		// Create user
-		user := &Client{
-			Id:             primitive.NewObjectID(),
-			Email:          creds.Email,
-			FirstName:      creds.FirstName,
-			LastName:       creds.LastName,
-			HashedPassword: hashedPassword,
-			Suspended:      false,
-			Groups:         creds.Groups,
-		}
-
-		// Insert user into database
-		_, err = users.InsertOne(context.Background(), user)
-		if err != nil {
-			log.Println("Unable to insert user into database: ", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			log.Println(w.Write([]byte(`{"message":"Unable to register user"}`)))
-		}
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(`{"message":"User registered successfully"}`))
 	}
@@ -118,36 +93,24 @@ func makeServiceRegistrationHandler(clients *mongo.Collection, validate *validat
 		}
 
 		// Check if service already registered
-		filter := bson.D{{Key: "email", Value: creds.Email}}
-		mongoErr := clients.FindOne(context.Background(), filter).Err()
-		if mongoErr != mongo.ErrNoDocuments {
+		if clientExists(clients, creds.Email) {
 			w.WriteHeader(http.StatusConflict)
 			log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
 			return
 		}
 
 		// Create new client
-		service := &Client{
-			Id:        primitive.NewObjectID(),
-			Email:     creds.Email,
-			Name:      creds.Name,
-			Groups:    creds.Groups,
-			Suspended: false,
-		}
-
-		// Insert user into database
-		_, err = clients.InsertOne(context.Background(), service)
+		err = createNewServiceClient(clients, creds.Email, creds.Name, creds.Groups)
 		if err != nil {
-			log.Println("Unable to insert service into database: ", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Println(w.Write([]byte(`{"message":"Unable to register user"}`)))
+			w.Write([]byte(`{"message":"Unable to register service"}`))
 		}
 
 		// If client exists generate a new token
 		// BUG: Potentially not returning the correct api token
-		apiToken := generateAPIClientToken(service)
+		// apiToken := generateAPIClientToken(service)
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`"serviceToken": "` + apiToken.Raw + `"`))
+		// w.Write([]byte(`"serviceToken": "` + apiToken.Raw + `"`))
 	}
 }

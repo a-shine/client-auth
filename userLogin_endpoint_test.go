@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -34,9 +35,8 @@ func TestSuccessfulUserLogin(t *testing.T) {
 	// Send request to service
 	handler.ServeHTTP(recorder, req)
 
-	if recorder.Code != http.StatusOK {
-		t.Error("Endpoint did not return correct status code")
-	}
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, `{"message":"Login successful"}`, recorder.Body.String())
 }
 
 func TestFailedLoginWithInvalidEmail(t *testing.T) {
@@ -53,9 +53,8 @@ func TestFailedLoginWithInvalidEmail(t *testing.T) {
 	// Send request to service
 	handler.ServeHTTP(recorder, req)
 
-	if recorder.Code != http.StatusUnauthorized {
-		t.Error("Endpoint did not return correct status code")
-	}
+	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+	assert.Equal(t, `{"message":"No account registered with this email"}`, recorder.Body.String())
 }
 
 func TestLoginWithInvalidPassword(t *testing.T) {

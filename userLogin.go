@@ -1,14 +1,12 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -33,9 +31,8 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 		}
 
 		// Get the user details from the database
-		user := &Client{}
-		notFoundErr := users.FindOne(context.Background(), bson.D{{Key: "email", Value: creds.Email}}).Decode(user)
-		if notFoundErr == mongo.ErrNoDocuments {
+		user, err := getClientByEmail(users, creds.Email)
+		if err == mongo.ErrNoDocuments {
 			w.WriteHeader(http.StatusUnauthorized)
 			log.Println(w.Write([]byte(`{"message":"No account registered with this email"}`)))
 			return
@@ -90,6 +87,9 @@ func makeLoginHandler(users *mongo.Collection) http.HandlerFunc {
 			Expires: expirationTime,
 			Path:    "/",
 		})
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"message":"Login successful"}`))
 	}
 }
 

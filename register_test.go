@@ -1,5 +1,7 @@
 package main
 
+import "testing"
+
 // https://github.com/tryvium-travels/memongo
 //https://medium.com/@victor.neuret/mocking-the-official-mongo-golang-driver-5aad5b226a78
 // Good repo with examples on how to mock mongoDB
@@ -7,6 +9,10 @@ package main
 // Here we are testing the API endpoints as a form of integration testing. This
 // requires other dependent services to be available such as the database and
 // cache so docker compose is used to faciliate orchestration
+
+func TestXxx(t *testing.T) {
+	t.Error("Not implemented")
+}
 
 // func TestRegisterNewUser(t *testing.T) {
 // 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))

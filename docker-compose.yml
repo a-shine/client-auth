@@ -1,7 +1,13 @@
+version: '3.8' # latest version as of 10/04/2023
+
 services:
-  client-authentication:
+
+  # Build and run the client-auth service with the production Dockerfile 
+  # (Dockerfile.prod). This image is smaller and only contains the final binary.
+  client-auth:
     build:
       context: .
+      dockerfile: ./Dockerfile.prod
     ports:
       - "8000:8000"
     environment:
@@ -18,7 +24,11 @@ services:
     depends_on:
       - client-db
       - client-auth-cache
-  client-authentication-test:
+
+  # Build the test image (Dockerfile.test) and run the integration tests. A 
+  # different Dockerfile/container is required as the prod image does not 
+  # contain the go toolchain and hence canot run the tests.
+  client-auth-test:
     build:
       context: .
       dockerfile: ./Dockerfile.test
@@ -36,6 +46,8 @@ services:
     depends_on:
       - client-db
       - client-auth-cache
+
+  # Dcoument database storing user information
   client-db:
     image: mongo
     ports:
@@ -44,6 +56,9 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=secret
       - MONGO_INITDB_DATABASE=user_management
+
+  # Cache service required for live user blackisting (deactivating/bocking 
+  # accounts) and user deletion cascade handling
   client-auth-cache:
     image: redis
     ports:
@@ -51,6 +66,7 @@ services:
     command: /bin/sh -c "redis-server --requirepass $$REDIS_PASSWORD"
     environment:
       - REDIS_PASSWORD=password123
+
   # Debugging
   db-gui:
     image: mongo-express

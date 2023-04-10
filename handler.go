@@ -17,7 +17,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: Add validation to all JSON payloads
 // TODO: Finish tests
 
 // Claim describes the structure of a JWT claim (this is the same payload as in the

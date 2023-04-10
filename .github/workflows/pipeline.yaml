@@ -17,7 +17,7 @@ jobs:
       - name: Start test environment
         uses: isbang/compose-action@v1.4.1
         with:
-          compose-file: "./docker-compose.yml"
+          compose-file: "./docker-compose.yaml"
           services: client-authentication-test
   # build:
   #   runs-on: ubuntu-latest

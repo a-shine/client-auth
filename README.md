@@ -1,4 +1,6 @@
-# Simple client authentication service
+# Client authentication service
+
+[![CI](https://github.com/a-shine/client-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/a-shine/client-auth/actions/workflows/ci.yml)
 
 Simple client authentication service providing functionality to register, login
 (generate JWT authentication tokens), refresh (old tokens), return data, logout,

@@ -2,11 +2,23 @@ package main
 
 import (
 	"context"
+	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
+
+// hashAndSalt hashes a provided password and returns the hashed password as a string
+func hashAndSalt(pwd string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
+	if err != nil {
+		log.Println("Unable to hash password: ", err)
+		return "", err
+	}
+	return string(hash), nil
+}
 
 func createNewUserClient(clients *mongo.Collection, email string, password string, firstName string, lastName string, groups []string) error {
 	// Hash user password before storing in database

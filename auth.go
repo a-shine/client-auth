@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -19,16 +17,6 @@ type Claim struct {
 	Id     string   `json:"id"`
 	Groups []string `json:"groups"` // TODO: Use this to check if user is admin, allows groups to be verified by the API gateway
 	jwt.RegisteredClaims
-}
-
-// hashAndSalt hashes a provided password and returns the hashed password as a string
-func hashAndSalt(pwd string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
-	if err != nil {
-		log.Println("Unable to hash password: ", err)
-		return "", err
-	}
-	return string(hash), nil
 }
 
 // verifyPassword compares a hashed password with the raw password
@@ -122,30 +110,4 @@ func generateAPIClientToken(client *Client) *jwt.Token {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token
 
-}
-
-// me handler for user details
-func makeMeHandler(users *mongo.Collection) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		code, claim := processClaim(r)
-		if code != http.StatusOK {
-			w.WriteHeader(code)
-			log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
-			return
-		}
-
-		status, user := authAndAuthorised(users, claim)
-		if status == http.StatusOK {
-			err := json.NewEncoder(w).Encode(user)
-			if err != nil {
-				log.Println("Unable to encode user: ", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		} else {
-			// w.WriteHeader(http.StatusUnauthorized)
-			w.WriteHeader(status)
-			return
-		}
-	}
 }

@@ -15,16 +15,27 @@ import (
 )
 
 // Get env variables and make available package wide
+var dbHost = os.Getenv("DB_HOST")
+var dbPort = os.Getenv("DB_PORT")
+var dbUser = os.Getenv("DB_USER")
+var dbPassword = os.Getenv("DB_PASSWORD")
+var dbName = os.Getenv("DB_NAME")
 var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
+
 var maxJwtTokenExpiration time.Duration
+
+func setTokenExpirationDuration() {
+	// Get max expiration time of JWT token from env variable and convert to
+	// integer
+	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
+	if err != nil {
+		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
+	}
+	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
+}
 
 func getClientCollection() *mongo.Collection {
 	// Getting env variables for connecting to database
-	var dbHost = os.Getenv("DB_HOST")
-	var dbPort = os.Getenv("DB_PORT")
-	var dbUser = os.Getenv("DB_USER")
-	var dbPassword = os.Getenv("DB_PASSWORD")
-	var dbName = os.Getenv("DB_NAME")
 
 	// Construct a connection string to the database
 	mongoUri := "mongodb://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort
@@ -97,12 +108,7 @@ func createHandler(clients *mongo.Collection, rdb *redis.Client) *http.ServeMux 
 }
 
 func main() {
-	// Get max expiration time of JWT token
-	mins, err := strconv.Atoi(os.Getenv("JWT_TOKEN_EXP_MIN"))
-	if err != nil {
-		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
-	}
-	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
+	setTokenExpirationDuration()
 
 	log.Println("Connecting to user database...")
 	users := getClientCollection()

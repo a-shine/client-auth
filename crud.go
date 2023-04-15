@@ -46,7 +46,9 @@ func createNewUserClient(clients *mongo.Collection, email string, password strin
 	return nil
 }
 
-func createNewServiceClient(clients *mongo.Collection, email string, name string, groups []string) error {
+func createNewServiceClient(clients *mongo.Collection, email string, name string, groups []string) (*Client, error) {
+	groups = append(groups, "service")
+
 	// Create service
 	service := &Client{
 		Id:        primitive.NewObjectID(),
@@ -58,10 +60,7 @@ func createNewServiceClient(clients *mongo.Collection, email string, name string
 
 	// Insert service into database
 	_, err := clients.InsertOne(context.Background(), service)
-	if err != nil {
-		return err
-	}
-	return nil
+	return service, err
 }
 
 func getClientByEmail(clients *mongo.Collection, email string) (*Client, error) {

@@ -1,5 +1,7 @@
 # Client authentication service
 
+<!-- TODO: Update the README -->
+
 [![CI](https://github.com/a-shine/client-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/a-shine/client-auth/actions/workflows/ci.yml)
 
 Simple client authentication service providing functionality to register, login

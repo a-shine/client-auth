@@ -100,14 +100,16 @@ func authAndAuthorisedAdmin(users *mongo.Collection, claim *Claim) (int, *Client
 }
 
 // Needs to be a jwt token so that the API gateway can verify it
-func generateAPIClientToken(client *Client) *jwt.Token {
+func generateAPIClientToken(client *Client) (string, error) {
 	// Create the JWT claims, which includes the user ID with no expiration time
 	claims := &Claim{
 		Id:               client.Id.Hex(),
+		Groups:           client.Groups,
 		RegisteredClaims: jwt.RegisteredClaims{},
 	}
+
 	// Create the JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token
-
+	tokenStr, err := token.SignedString(jwtKey)
+	return tokenStr, err
 }

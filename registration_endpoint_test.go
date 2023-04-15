@@ -15,7 +15,7 @@ import (
 )
 
 // https://github.com/tryvium-travels/memongo
-//https://medium.com/@victor.neuret/mocking-the-official-mongo-golang-driver-5aad5b226a78
+// https://medium.com/@victor.neuret/mocking-the-official-mongo-golang-driver-5aad5b226a78
 // Good repo with examples on how to mock mongoDB
 
 // Here we are testing the API endpoints as a form of integration testing. This
@@ -86,6 +86,10 @@ func TestSuccessfulServiceRegistration(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, recorder.Code)
 
 	// TODO: Test that correct service API token is returned (compute what the token should be?)
+	// assert.Equal(t, `{"message":"Service registered successfully"}`, recorder.Body.String())
+
+	// Test that the body returns both the service API token and a success message
+
 }
 
 // Test case for attempting to register a user that already exists
@@ -118,15 +122,12 @@ func TestFailedPreexistingUserRegistration(t *testing.T) {
 }
 
 // Test case for attempting to register a user with an invalid payload
-func TestFailedInvalidRegisterSchema(t *testing.T) {
+func TestFailedMissingFirstNameRegistration(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	// New user json with missing firstName field
 	user := `{"email": "john@smith.com", "password": "somePassword", 
 				"lastName": "Smith", "groups": ["admin"]}`
-
-	// New user json with misspelled email field
-	// user = `{"emal": "john@smith.com", "password": "somePassword", "lastName": "Smith"}`
 
 	// Create a new request
 	req, _ := http.NewRequest("POST", "/register-user", strings.NewReader(user))
@@ -135,5 +136,21 @@ func TestFailedInvalidRegisterSchema(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 
 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-	// assert.Equal(t, `{"message":"Invalid JSON payload"}`, recorder.Body.String())
+	assert.Equal(t, `{"message":"Key: 'UserRegistrationForm.FirstName' Error:Field validation for 'FirstName' failed on the 'required' tag"}`, recorder.Body.String())
+}
+
+func TestFailedInvalidJson(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	user := `"email": "john@smith.com",, "password": "somePassword", 
+				"firstName": "John", "lastName": "Smith", "groups": ["admin"]}`
+
+	// Create a new request
+	req, _ := http.NewRequest("POST", "/register-user", strings.NewReader(user))
+
+	// Send request to service
+	handler.ServeHTTP(recorder, req)
+
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Equal(t, `{"message":"Invalid JSON payload"}`, recorder.Body.String())
 }

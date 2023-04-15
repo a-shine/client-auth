@@ -15,4 +15,4 @@ jobs:
         with:
           file: docker-compose.yml
           service: client-auth-test
-          command: go test
+          command: run-test.sh

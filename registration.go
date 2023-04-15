@@ -1,10 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"log"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -27,42 +26,33 @@ type ServiceRegistrationForm struct {
 // makeUserRegistrationHandler registers handler function for client registration endpoint
 // If client is a user a password, first name and last name are required
 // If a client is a service (IoT device) only an email is required (the email serves as the unique identifier)
-func makeUserRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var creds UserRegistrationForm
+func makeUserRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var form UserRegistrationForm
 
-		// Get the JSON body and decode into credentials
-		err := json.NewDecoder(r.Body).Decode(&creds)
-		if err != nil {
-			// If the structure of the body is wrong, return an HTTP error
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
+		// Bind the JSON payload to the form
+		if err := c.ShouldBindJSON(&form); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Invalid JSON payload"})
 			return
 		}
 
-		// validate json schema
-		err = validate.Struct(creds)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
+		// Validate the form against the schema
+		if err := validate.Struct(form); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 			return
 		}
 
 		// Check if user already exists
-		if clientExists(clients, creds.Email) {
-			w.WriteHeader(http.StatusConflict)
-			log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
+		if clientExists(clients, form.Email) {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"message": "A user associated with the email address is already registered"})
 			return
 		}
 
-		err = createNewUserClient(clients, creds.Email, creds.Password, creds.FirstName, creds.LastName, creds.Groups)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"message":"Unable to register user"}`))
+		if err := createNewUserClient(clients, form.Email, form.Password, form.FirstName, form.LastName, form.Groups); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unable to register user"})
 		}
 
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"message":"User registered successfully"}`))
+		c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
 	}
 }
 
@@ -71,46 +61,37 @@ func makeUserRegistrationHandler(clients *mongo.Collection, validate *validator.
 // with the backend. A service is not a user and therefore does not have a
 // password, first name, last name, etc. The handler returns a JWT token that
 // does not expire and is used to authenticate the service.
-func makeServiceRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var creds ServiceRegistrationForm
+func makeServiceRegistrationHandler(clients *mongo.Collection, validate *validator.Validate) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var form ServiceRegistrationForm
 
-		// Get the JSON body and decode into credentials
-		err := json.NewDecoder(r.Body).Decode(&creds)
-		if err != nil {
-			// If the structure of the body is wrong, return an HTTP error
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"message":"Invalid JSON payload"}`))
+		// Bind the JSON payload to the form
+		if err := c.ShouldBindJSON(&form); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Invalid JSON payload"})
 			return
 		}
 
-		// Validate JSON schema
-		err = validate.Struct(creds)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"message":"Invalid payload fields"}`))
+		// Validate the form against the schema
+		if err := validate.Struct(form); err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 			return
 		}
 
 		// Check if service already registered
-		if clientExists(clients, creds.Email) {
-			w.WriteHeader(http.StatusConflict)
-			log.Println(w.Write([]byte(`{"message":"An account with that email address is already registered"}`)))
+		if clientExists(clients, form.Email) {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"message": "A service associated with the email address is already registered"})
 			return
 		}
 
 		// Create new client
-		err = createNewServiceClient(clients, creds.Email, creds.Name, creds.Groups)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"message":"Unable to register service"}`))
+		if err := createNewServiceClient(clients, form.Email, form.Name, form.Groups); err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unable to register service"})
 		}
 
-		// If client exists generate a new token
-		// BUG: Potentially not returning the correct api token
+		// TODO: Return a JWT token (that doesn't expire) to the client so that
+		//  it can be used to authenticate JWTs
 		// apiToken := generateAPIClientToken(service)
 
-		w.WriteHeader(http.StatusCreated)
-		// w.Write([]byte(`"serviceToken": "` + apiToken.Raw + `"`))
+		c.JSON(http.StatusCreated, gin.H{"message": "Service registered successfully"})
 	}
 }

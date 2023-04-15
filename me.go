@@ -1,36 +1,36 @@
 package main
 
 import (
-	"encoding/json"
-	"log"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // me handler for user details
 // TODO: update this to return user details from database and not from JWT token
-func makeMeHandler(users *mongo.Collection) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		code, claim := processClaim(r)
+func makeMeHandler(users *mongo.Collection) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get the JWT token from cookie
+		token, err := c.Cookie("token")
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Unable to get JWT token from cookie"})
+			return
+		}
+
+		code, claim := processClaim(token)
 		if code != http.StatusOK {
-			w.WriteHeader(code)
-			log.Println(w.Write([]byte(`{"message": "Unable to process JWT token"}`)))
+			c.AbortWithStatusJSON(code, gin.H{"message": "Unable to process JWT token"})
 			return
 		}
 
 		status, user := authAndAuthorised(users, claim)
-		if status == http.StatusOK {
-			err := json.NewEncoder(w).Encode(user)
-			if err != nil {
-				log.Println("Unable to encode user: ", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		} else {
-			// w.WriteHeader(http.StatusUnauthorized)
-			w.WriteHeader(status)
+		if status != http.StatusOK {
+			c.AbortWithStatusJSON(status, gin.H{"message": "Unable to authenticate and authorise user"})
 			return
 		}
+
+		// Return the user details
+		c.JSON(http.StatusOK, gin.H{"user": user})
 	}
 }

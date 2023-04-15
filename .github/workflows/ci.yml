@@ -1,5 +1,4 @@
-name: Client auth service pipeline
-
+name: CI
 on:
   # Runs on pushes targeting the default branch
   push:

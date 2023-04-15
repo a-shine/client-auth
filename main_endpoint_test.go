@@ -1,17 +1,17 @@
 package main
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/brianvoe/gofakeit"
+	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var clients *mongo.Collection
 var rdb *redis.Client
-var handler *http.ServeMux
+var handler *gin.Engine
 
 func genRandomEmail() string {
 	gofakeit.Seed(0)

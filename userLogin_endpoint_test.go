@@ -36,7 +36,7 @@ func TestSuccessfulUserLogin(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, `{"message":"Login successful"}`, recorder.Body.String())
+	assert.Equal(t, `{"message":"Successfully logged in"}`, recorder.Body.String())
 }
 
 func TestFailedLoginWithInvalidEmail(t *testing.T) {
@@ -53,8 +53,8 @@ func TestFailedLoginWithInvalidEmail(t *testing.T) {
 	// Send request to service
 	handler.ServeHTTP(recorder, req)
 
-	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
-	assert.Equal(t, `{"message":"No account registered with this email"}`, recorder.Body.String())
+	assert.Equal(t, http.StatusNotFound, recorder.Code)
+	assert.Equal(t, `{"message":"User not found"}`, recorder.Body.String())
 }
 
 func TestLoginWithInvalidPassword(t *testing.T) {

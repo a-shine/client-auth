@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,7 +22,7 @@ var dbPassword = os.Getenv("DB_PASSWORD")
 var dbName = os.Getenv("DB_NAME")
 var jwtKey = []byte(os.Getenv("JWT_SECRET_KEY"))
 
-var maxJwtTokenExpiration time.Duration
+var jwtTokenExpiration time.Duration
 
 func setTokenExpirationDuration() {
 	// Get max expiration time of JWT token from env variable and convert to
@@ -31,12 +31,10 @@ func setTokenExpirationDuration() {
 	if err != nil {
 		log.Fatalln("Invalid JWT_TOKEN_EXP_MIN env variable value")
 	}
-	maxJwtTokenExpiration = time.Duration(mins) * time.Minute
+	jwtTokenExpiration = time.Duration(mins) * time.Minute
 }
 
 func getClientCollection() *mongo.Collection {
-	// Getting env variables for connecting to database
-
 	// Construct a connection string to the database
 	mongoUri := "mongodb://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort
 	clientOptions := options.Client().ApplyURI(mongoUri)
@@ -81,28 +79,29 @@ func getCache() *redis.Client {
 	return rdb
 }
 
-func createHandler(clients *mongo.Collection, rdb *redis.Client) *http.ServeMux {
+func createHandler(clients *mongo.Collection, rdb *redis.Client) *gin.Engine {
 	// create an http handler
-	handler := http.NewServeMux()
-
+	handler := gin.Default()
 	validate := validator.New()
 
-	// Both services and users are clients
-	// Register user (has a temporary JWT token that needs to be refreshed hence more secure for users but difficult to interact programmatically)
-	// Register service (has a persistent JWT token that remains available to identify the service)
+	// Add logging middleware
+	handler.Use(gin.Logger())
 
-	// Register new clients
-	handler.HandleFunc("/register-user", makeUserRegistrationHandler(clients, validate))       // should be able to register both users and generic clients
-	handler.HandleFunc("/register-service", makeServiceRegistrationHandler(clients, validate)) // (Persistent API tokens for other programs to interact with) gen tokens for clients (including users)
+	// Both Services and Users are clients
+	// - Users have a temporary JWT token which is set as a browser cookie that needs to be refreshed (more secure for users but difficult to interact programmatically)
+	// - Service have persistent JWT token (doesn't expire) that remains available to identify the service (decoded by the gateway)
 
-	// User specific routes
-	handler.HandleFunc("/login", makeLoginHandler(clients)) // only to register users (generates temporary tokens while gen-api-token generates persistent tokens)
-	handler.HandleFunc("/refresh-user-token", makeRefreshHandler(clients))
-	handler.HandleFunc("/logout", makeLogoutHandler())
+	handler.POST("/register-user", makeUserRegistrationHandler(clients, validate))
+	handler.POST("/register-service", makeServiceRegistrationHandler(clients, validate))
 
-	handler.HandleFunc("/me", makeMeHandler(clients))
-	handler.HandleFunc("/delete", makeDeleteUserHandler(clients, rdb))
-	handler.HandleFunc("/suspend", makeSuspendClient(clients, rdb))
+	// User browser login specific routes
+	handler.POST("/login", makeLoginHandler(clients, validate)) // only to register users (generates temporary tokens while gen-api-token generates persistent tokens)
+	handler.GET("/refresh-user-token", makeRefreshHandler(clients))
+	handler.POST("/logout", makeLogoutHandler()) // https://stackoverflow.com/questions/3521290/logout-get-or-post
+
+	handler.GET("/me", makeMeHandler(clients))
+	handler.POST("/delete", makeDeleteUserHandler(clients, rdb))
+	handler.POST("/suspend", makeSuspendClient(clients, rdb))
 
 	return handler
 }
@@ -118,5 +117,6 @@ func main() {
 
 	handler := createHandler(users, rdb)
 	log.Println("Starting server on port 8000...")
-	log.Fatalln(http.ListenAndServe(":8000", handler))
+	// log.Fatalln(http.ListenAndServe(":8000", handler))
+	handler.Run(":8000")
 }

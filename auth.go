@@ -26,19 +26,19 @@ func verifyPassword(hashedPwd string, plainPwd string) bool {
 	return err == nil // true if the err is nil and false otherwise
 }
 
-func processClaim(r *http.Request) (int, *Claim) {
+func processClaim(token string) (int, *Claim) {
 	claim := &Claim{}
 
-	c, err := r.Cookie("token")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return http.StatusUnauthorized, nil
-		}
-		return http.StatusBadRequest, nil
-	}
-	tknStr := c.Value
+	// c, err := r.Cookie("token")
+	// if err != nil {
+	// 	if err == http.ErrNoCookie {
+	// 		return http.StatusUnauthorized, nil
+	// 	}
+	// 	return http.StatusBadRequest, nil
+	// }
+	// tknStr := c.Value
 
-	tkn, err := jwt.ParseWithClaims(tknStr, claim, func(token *jwt.Token) (interface{}, error) {
+	tkn, err := jwt.ParseWithClaims(token, claim, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
 	if err != nil {

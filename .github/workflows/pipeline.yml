@@ -1,0 +1,47 @@
+name: Client authentication service pipeline
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+
+  # Allows you to run workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  TEST_TAG: client-authentication:test
+  LATEST_TAG: client-authentication:latest
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build and push test container
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.dev
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.TEST_TAG }}
+      - name: Orchestrate test environment and run tests
+        uses: cloudposse/github-action-docker-compose-test-run@main
+        with:
+          file: docker-compose.yml
+          service: client-auth-test
+          command: run-tests.sh
+      - name: Build and push container
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.prod
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.LATEST_TAG }}

@@ -11,7 +11,7 @@
           uses: actions/checkout@v3
   
         - name: Tests
-          uses: cloudposse/github-action-docker-compose-test-run@main
+          uses: cloudposse/github-action-docker-compose-test-run
           with:
             file: docker-compose.yml
             service: client-auth-test

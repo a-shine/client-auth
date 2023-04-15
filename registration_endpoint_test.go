@@ -20,11 +20,7 @@ import (
 
 // Here we are testing the API endpoints as a form of integration testing. This
 // requires other dependent services to be available such as the database and
-// cache so docker compose is used to faciliate orchestration
-
-func TestAlwaysFail(t *testing.T) {
-	assert.Equal(t, 1, 2)
-}
+// cache so docker compose is used to facilitate orchestration
 
 // Test case for successful user registration
 func TestSuccessfulUserRegistration(t *testing.T) {

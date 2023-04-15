@@ -1,4 +1,4 @@
-name: Client authentication service pipeline
+name: Client auth service pipeline
 
 on:
   # Runs on pushes targeting the default branch
@@ -35,7 +35,7 @@ jobs:
       - name: Orchestrate test environment and run tests
         uses: cloudposse/github-action-docker-compose-test-run@main
         with:
-          file: docker-compose.yml
+          file: docker-compose.test.yml
           service: client-auth-test
           command: run-tests.sh
       - name: Build and push container

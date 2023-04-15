@@ -1,37 +1,13 @@
 version: '3.8' # latest version as of 10/04/2023
 
 services:
-
-  # Build and run the client-auth service with the production Dockerfile 
-  # (Dockerfile.prod). This image is smaller and only contains the final binary.
-  client-auth:
-    build:
-      context: .
-      dockerfile: ./Dockerfile.prod
-    ports:
-      - "8000:8000"
-    environment:
-      - JWT_SECRET_KEY=secret
-      - JWT_TOKEN_EXP_MIN=60
-      - DB_HOST=client-db
-      - DB_PORT=27017
-      - DB_USER=root
-      - DB_PASSWORD=secret
-      - DB_NAME=user_management
-      - REDIS_HOST=client-auth-cache
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=password123
-    depends_on:
-      - client-db
-      - client-auth-cache
-
   # Build the test image (Dockerfile.test) and run the integration tests. A 
   # different Dockerfile/container is required as the prod image does not 
   # contain the go toolchain and hence canot run the tests.
-  client-auth-dev:
+  client-auth-test:
     build:
       context: .
-      dockerfile: ./Dockerfile.dev
+      dockerfile: ashinebourne/client-authentication:test
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60
@@ -49,7 +25,7 @@ services:
 
   # Dcoument database storing user information
   client-db:
-    image: mongo:latest
+    image: mongo:6.0.5
     ports:
       - "27017:27017"
     environment:
@@ -60,20 +36,9 @@ services:
   # Cache service required for live user blackisting (deactivating/bocking 
   # accounts) and user deletion cascade handling
   client-auth-cache:
-    image: redis:latest
+    image: redis:7.0.10-alpine
     ports:
       - 6379:6379
     command: /bin/sh -c "redis-server --requirepass $$REDIS_PASSWORD"
     environment:
       - REDIS_PASSWORD=password123
-
-  # Debugging
-  db-gui:
-    image: mongo-express:latest
-    ports:
-      - "8081:8081"
-    environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: secret
-      ME_CONFIG_MONGODB_SERVER: client-db
-    restart: always

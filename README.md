@@ -27,7 +27,7 @@ as a pre-built client authentication service.
 - User login/logout
   - Generates a JWT token
   - Returns the token in a set-cookie header
-  - TODO: Refreshes a JWT token
+  <!-- - Refreshes a JWT token (not yet implemented) -->
   - Logout by deleting the JWT token from the browser
 - Real-time user suspension (account disablement)
   - Cache of suspended user IDs in Redis which can be checked on every request at the gateway level

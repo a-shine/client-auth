@@ -10,13 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// LoginForm describes the expected json payload when a user logs in
+// LoginForm describes the expected JSON payload when a user logs in
 type LoginForm struct {
 	Password string `json:"password" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 }
 
-// login handler for user login
 func makeLoginHandler(users *mongo.Collection, validate *validator.Validate) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var form LoginForm
@@ -85,58 +84,18 @@ func makeLoginHandler(users *mongo.Collection, validate *validator.Validate) gin
 	}
 }
 
-// BUG: This refresh logic is not correct
-// Refresh is called by frontend when 401 is received it is a way of authenticating user and extending their session without the need for them to input there credentials again but also checks that they are still authorised to use the system
-// refresh handler enabling authenticated non-suspended users to apply for new token lengthening their session. // If
-// unable to authenticate user or is not authorised (e.g. suspended) then do not refresh token
-func makeRefreshHandler(users *mongo.Collection) gin.HandlerFunc {
+func makeLogoutHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get the JWT string from the cookie
-		oldToken, err := c.Cookie("token")
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Unable to refresh token"})
-			return
-		}
-
-		code, claim := processClaim(oldToken)
-		if code != http.StatusOK {
-			c.AbortWithStatusJSON(code, gin.H{"message": "Unable to refresh token"})
-		}
-
-		code, _ = authAndAuthorised(users, claim)
-		if code != http.StatusOK {
-			c.AbortWithStatusJSON(code, gin.H{"message": "Unable to refresh token"})
-			return
-		}
-
-		// We ensure that a new token is not issued until enough time has elapsed. In this case, a new token will only be
-		// issued if the old token is within 30 seconds of expiry. Otherwise, return a bad request status.
-		if time.Until(claim.ExpiresAt.Time) > 30*time.Second {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Token not expired"})
-			return
-		}
-
-		// Now, create a new token for the current use, with a renewed expiration time
-		expirationTime := time.Now().Add(5 * time.Minute)
-		claim.ExpiresAt = jwt.NewNumericDate(expirationTime)
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
-		newToken, err := token.SignedString(jwtKey)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Unable to refresh token"})
-			return
-		}
-
-		// Set the new token as the users `token` cookie
-		c.SetCookie("token", newToken, int(expirationTime.Unix()), "/", "localhost", false, true)
-		c.JSON(http.StatusOK, gin.H{"message": "Successfully refreshed token"})
+		// Clear the token cookie by setting cookie to expiry now
+		c.SetCookie("token", "", 0, "/", "localhost", false, true)
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 	}
 }
 
-// logout handler for user logout
-func makeLogoutHandler() gin.HandlerFunc {
+func makeRefreshHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Immediately clear the token cookie by setting cookie expiry to now
-		c.SetCookie("token", "", 0, "/", "localhost", false, true)
-		c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
+		// TODO: Implement refresh handler
+		// Try understand refresh token vs access token and how to implement refresh token
+		c.JSON(http.StatusOK, gin.H{"message": "Token refresh not possible yet"})
 	}
 }

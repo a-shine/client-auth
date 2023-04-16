@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,7 +16,7 @@ import (
 // https://github.com/a-shine/api-gateway repo which is what makes them compatible)
 type Claim struct {
 	Id     string   `json:"id"`
-	Groups []string `json:"groups"` // TODO: Use this to check if user is admin, allows groups to be verified by the API gateway
+	Groups []string `json:"groups"`
 	jwt.RegisteredClaims
 }
 
@@ -112,4 +113,30 @@ func generateAPIClientToken(client *Client) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString(jwtKey)
 	return tokenStr, err
+}
+
+func genToken(id string, groups []string) (string, error) {
+	// Declare the expiration time of the token as determined by the jwtTokenExpiration variable
+	expirationTime := time.Now().Add(jwtTokenExpiration)
+
+	// Create the JWT claims, which includes the authenticated user ID and expiry time
+	claims := &Claim{
+		Id:     id,
+		Groups: groups,
+		RegisteredClaims: jwt.RegisteredClaims{
+			// In JWT, the expiry time is expressed as unix milliseconds
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+
+	// Create the token with the HS256 algorithm used for signing, and the created claim
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Create the JWT string
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		// If there is an error in creating the JWT return an internal server error
+		return "", err
+	}
+	return tokenString, nil
 }

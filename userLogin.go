@@ -92,7 +92,7 @@ func makeLogoutHandler() gin.HandlerFunc {
 	}
 }
 
-func makeRefreshHandler() gin.HandlerFunc {
+func makeRefreshHandler(users *mongo.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: Implement refresh handler
 		// Try understand refresh token vs access token and how to implement refresh token

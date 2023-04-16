@@ -18,6 +18,23 @@ This user management service integrates well with the
 [a-shine/api-gateway](https://github.com/a-shine/api-gateway) and can be used
 as a pre-built client authentication service.
 
+## Features
+
+- Registering a new client
+  - Distinguishes between user clients (which interface organically through
+    the browser) and service clients (which interface programmatically through
+    an API)
+- User login/logout
+  - Generates a JWT token
+  - Returns the token in a set-cookie header
+  - TODO: Refreshes a JWT token
+  - Logout by deleting the JWT token from the browser
+- Real-time user suspension (account disablement)
+  - Cache of suspended user IDs in Redis which can be checked on every request at the gateway level
+- Client data deletion cascade
+  - Publishes a `client-data-deletion-request` to a pubsub channel to enable
+    other services to delete client data
+
 ## Getting started
 
 This user management service has two main dependencies:
@@ -115,7 +132,9 @@ Return user data:
 curl -v --cookie "token=[TOKEN]" localhost:8000/me
 ```
 
-## Testing
+## Development
+
+### Testing
 
 The test image is built within the `docker-compose.yaml` build process.
 

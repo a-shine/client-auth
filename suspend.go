@@ -9,9 +9,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// TODO: May be worth thinking more about how the suspend account logic should
-// work. Maybe don't have it submitted by an admin but simply let the user
-// suspend his own account?
+// May be worth thinking more about how the suspend account logic should work.
+// Maybe don't have it submitted by an admin but simply let the user suspend
+// his own account?
 
 // SuspendForm describes the expected json payload when a user suspension request is made
 type SuspendForm struct {

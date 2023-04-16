@@ -8,7 +8,6 @@ import (
 )
 
 // me handler for user details
-// TODO: update this to return user details from database and not from JWT token
 func makeMeHandler(users *mongo.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the JWT token from cookie

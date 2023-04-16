@@ -85,11 +85,8 @@ func TestSuccessfulServiceRegistration(t *testing.T) {
 	// Check if user creation response is sent to the client
 	assert.Equal(t, http.StatusCreated, recorder.Code)
 
-	// TODO: Test that correct service API token is returned (compute what the token should be?)
-	// assert.Equal(t, `{"message":"Service registered successfully"}`, recorder.Body.String())
-
 	// Test that the body returns both the service API token and a success message
-
+	assert.Contains(t, recorder.Body.String(), `"apiToken"`)
 }
 
 // Test case for attempting to register a user that already exists

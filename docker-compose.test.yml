@@ -5,7 +5,7 @@ services:
   # different Dockerfile/container is required as the prod image does not 
   # contain the go toolchain and hence canot run the tests.
   client-auth-test:
-    image: ashinebourne/client-authentication:test
+    image: ashinebourne/client-auth:test
     environment:
       - JWT_SECRET_KEY=secret
       - JWT_TOKEN_EXP_MIN=60

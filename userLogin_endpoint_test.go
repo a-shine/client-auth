@@ -40,7 +40,7 @@ func TestSuccessfulUserLogin(t *testing.T) {
 }
 
 func TestFailedLoginWithInvalidEmail(t *testing.T) {
-	// Create http recorder to record response
+	// Create http recorder to record response``
 	recorder := httptest.NewRecorder()
 
 	email := genRandomEmail()

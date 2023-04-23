@@ -92,6 +92,7 @@ func makeLogoutHandler() gin.HandlerFunc {
 	}
 }
 
+// https://stackoverflow.com/questions/3487991/why-does-oauth-v2-have-both-access-and-refresh-tokens
 func makeRefreshHandler(users *mongo.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// TODO: Implement refresh handler

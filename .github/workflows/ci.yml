@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  TEST_TAG: client-authentication:test
-  LATEST_TAG: client-authentication:latest
+  TEST_TAG: client-auth:test
+  LATEST_TAG: client-auth:latest
 
 jobs:
   ci:

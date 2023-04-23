@@ -90,7 +90,7 @@ func TestSuccessfulServiceRegistration(t *testing.T) {
 }
 
 // Test case for attempting to register a user that already exists
-func TestFailedPreexistingUserRegistration(t *testing.T) {
+func TestFailedPreExistingUserRegistration(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	// Generate a new unique user email
